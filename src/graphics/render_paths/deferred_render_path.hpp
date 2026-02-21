@@ -17,6 +17,7 @@ public:
 	void Render(std::vector<Mesh> &meshes);
 	FramebufferID GetFramebuffer() const { return gbuffer; }
 	Texture GetColorTexture(uint32_t index) { return device->GetFramebuffer(gbuffer).color_textures[index]; }
+	std::vector<Texture> GetColorTextures() { return device->GetFramebuffer(gbuffer).color_textures; }
 	Texture GetDepthTexture() const { return device->GetFramebuffer(gbuffer).depth_texture; }
 
 	/*MaterialID CreateMaterial()
@@ -38,7 +39,7 @@ private:
 
 	PipelineID pipeline {};
 	FramebufferID gbuffer {};
-	FramebufferID light_buffer {};
+	//FramebufferID light_buffer {};
 	uint32_t width = 0;
 	uint32_t height = 0;
 	DescriptorSet scene_set {};

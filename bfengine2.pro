@@ -18,6 +18,7 @@ SOURCES += \
     src/graphics/render_doc.cpp \
     src/graphics/render_paths/debug_render_path.cpp \
     src/graphics/render_paths/deferred_render_path.cpp \
+    src/graphics/render_paths/point_light_render_path.cpp \
     src/graphics/vulkan/convert_enum_vk.cpp \
     src/graphics/vulkan/enumerate_stuff_vk.cpp \
     src/graphics/vulkan/render_device_vk.cpp \
@@ -48,6 +49,7 @@ HEADERS += \
     src/graphics/render_paths/debug_render_path.hpp \
     src/graphics/render_paths/deferred_render_path.hpp \
     src/graphics/render_paths/graphics_context.hpp \
+    src/graphics/render_paths/point_light_render_path.hpp \
     src/graphics/types.hpp \
     src/graphics/vulkan/convert_enum_vk.hpp \
     src/graphics/vulkan/enumerate_stuff_vk.hpp \

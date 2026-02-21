@@ -15,39 +15,39 @@ void Debug::Create(GraphicsContext *context)
 {
 	this->context = context;
 
-	Shader vs = device->LoadShader(Shader::Type::VERTEX, "forward/vk_line");
-	Shader fs = device->LoadShader(Shader::Type::FRAGMENT, "forward/vk_line");
-	Shader vs2 = device->LoadShader(Shader::Type::VERTEX, "forward/vk_texture");
-	Shader fs2 = device->LoadShader(Shader::Type::FRAGMENT, "forward/vk_texture");
+	Shader vs_line = device->LoadShader(Shader::Type::VERTEX, "forward/vk_line");
+	Shader fs_line = device->LoadShader(Shader::Type::FRAGMENT, "forward/vk_line");
+	Shader vs_texture = device->LoadShader(Shader::Type::VERTEX, "forward/vk_texture");
+	Shader fs_texture = device->LoadShader(Shader::Type::FRAGMENT, "forward/vk_texture");
 
-	PipelineDesc pipeline_desc
+	PipelineDesc pipeline_line_desc
 	{
-		.shaders = { vs, fs },
+		.shaders = { vs_line, fs_line },
 		.topology = Topology::LINES,
 		.vertex_attribs = Vertex::Attrib::POSITION,
 		.raster = {},
 		.framebuffer_id = {},
 	};
 
-	pipeline_lines = device->CreatePipeline("debug/colored_lines", pipeline_desc);
-
-	scene_set_lines = device->CreateDescriptorSet(pipeline_lines, Descriptor2::Set::SCENE);
-	device->WriteDescriptor(scene_set_lines, 0, context->active_camera_ubo);
-	device->WriteDescriptor(scene_set_lines, 1, context->model_matrices_ubo);
-	device->WriteDescriptor(scene_set_lines, 2, context->colors_ubo);
-
-	PipelineDesc pipeline2_desc
+	PipelineDesc pipeline_mesh_desc
 	{
-		.shaders = { vs2, fs2 },
+		.shaders = { vs_texture, fs_texture },
 		.topology = Topology::TRIANGLES,
 		.vertex_attribs = Vertex::Attrib::POSITION | Vertex::Attrib::TEXCOORD_0,
 		.raster = {},
 		.framebuffer_id = {},
 	};
 
-	pipeline_meshes = device->CreatePipeline("debug/textured_meshes", pipeline2_desc);
+	pipeline_lines = device->CreatePipeline("debug/colored_lines", pipeline_line_desc);
+	pipeline_meshes = device->CreatePipeline("debug/textured_meshes", pipeline_mesh_desc);
 
+	scene_set_lines = device->CreateDescriptorSet(pipeline_lines, Descriptor2::Set::SCENE);
 	scene_set_meshes = device->CreateDescriptorSet(pipeline_meshes, Descriptor2::Set::SCENE);
+
+	device->WriteDescriptor(scene_set_lines, 0, context->active_camera_ubo);
+	device->WriteDescriptor(scene_set_lines, 1, context->model_matrices_ubo);
+	device->WriteDescriptor(scene_set_lines, 2, context->colors_ubo);
+
 	device->WriteDescriptor(scene_set_meshes, 0, context->active_camera_ubo);
 	device->WriteDescriptor(scene_set_meshes, 1, context->model_matrices_ubo);
 }

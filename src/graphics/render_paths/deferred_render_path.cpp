@@ -1,4 +1,5 @@
 #include "deferred_render_path.hpp"
+#include "core/log.hpp"
 
 BF_BEGIN_NAMESPACE
 
@@ -19,21 +20,20 @@ void Deferred::Create(GraphicsContext *context)
 	{
 		.width = width,
 		.height = height,
-		.format = Texture::Format::SRGBA8,
+		.format = Texture::Format::RGBA16F,
 		.usage = Texture::Usage::COLOR_ATTACHMENT | Texture::Usage::SHADER_READ,
 		.levels = 1,
 		.pixels = nullptr,
+		.generate_mipmaps = false,
 	};
 
-	/*TextureDesc depth_desc
+	std::vector<Texture> color_textures
 	{
-		.width = width,
-		.height = height,
-		.format = Texture::Format::D24S8,
-		.usage = Texture::Usage::DEPTH_ATTACHMENT | Texture::Usage::SHADER_READ,
-		.levels = 1,
-		.pixels = nullptr,
-	};*/
+		device->CreateTexture("Render Target 0", color_desc),
+		device->CreateTexture("Render Target 1", color_desc),
+		device->CreateTexture("Render Target 2", color_desc),
+		device->CreateTexture("Render Target 3", color_desc),
+	};
 
 	FramebufferDesc framebuffer_desc
 	{
@@ -42,19 +42,19 @@ void Deferred::Create(GraphicsContext *context)
 		/*.color_texture_count = 1,
 		.color_format = Texture::Format::RGBA8_SRGB,
 		.depth_format = Texture::Format::D24S8,*/
-		.color_textures = { device->CreateTexture(color_desc, false) },
+		.color_textures = color_textures,
 		.depth_texture = device->GetDepthTexture(), //device->CreateTexture(depth_desc, false),
 	};
 
 	gbuffer = device->CreateFramebuffer(framebuffer_desc);
-	Shader vs = device->LoadShader(Shader::Type::VERTEX, "forward/vk_texture");
-	Shader fs = device->LoadShader(Shader::Type::FRAGMENT, "forward/vk_texture");
+	Shader vs = device->LoadShader(Shader::Type::VERTEX, "deferred/vk_texture");
+	Shader fs = device->LoadShader(Shader::Type::FRAGMENT, "deferred/vk_texture");
 
 	PipelineDesc pipeline_desc
 	{
 		.shaders = { vs, fs },
 		.topology = Topology::TRIANGLES,
-		.vertex_attribs = Vertex::Attrib::POSITION | Vertex::Attrib::TEXCOORD_0,
+		.vertex_attribs = Vertex::Attrib::POSITION | Vertex::Attrib::TEXCOORD_0| Vertex::Attrib::NORMAL | Vertex::Attrib::TANGENT,
 		.raster = {},
 		.framebuffer_id = gbuffer,
 	};
@@ -62,7 +62,6 @@ void Deferred::Create(GraphicsContext *context)
 	pipeline = device->CreatePipeline("deferred/static_meshes", pipeline_desc);
 
 	scene_set = device->CreateDescriptorSet(pipeline, Descriptor2::Set::SCENE);
-	//context->material_set = device->CreateDescriptorSet(pipeline, Descriptor2::Set::MATERIAL);
 	device->WriteDescriptor(scene_set, 0, context->active_camera_ubo);
 	device->WriteDescriptor(scene_set, 1, context->model_matrices_ubo);
 }
@@ -74,9 +73,6 @@ void Deferred::Destroy()
 
 void Deferred::Render(std::vector<Mesh> &meshes)
 {
-	device->LayoutTransition(device->GetFramebuffer(gbuffer).color_textures[0], ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
-	device->LayoutTransition(device->GetFramebuffer(gbuffer).depth_texture, ImageLayout::UNDEFINED, ImageLayout::DEPTH_STENCIL_ATTACHMENT);
-
 	device->BeginRenderPass(gbuffer, RenderPass::Clear::COLOR_DEPTH);
 
 	device->BindPipeline(pipeline);
@@ -101,8 +97,6 @@ void Deferred::Render(std::vector<Mesh> &meshes)
 	}
 
 	device->EndRenderPass(gbuffer);
-
-	device->LayoutTransition(GetColorTexture(0), ImageLayout::COLOR_ATTACHMENT, ImageLayout::SHADER_READ_ONLY);
 }
 
 

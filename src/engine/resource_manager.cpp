@@ -82,7 +82,7 @@ Texture ResourceManager::LoadTexture(std::string_view filename)
 			break;
 
 		default:
-			Log("ResourceManager::LoadTexture") << "Unsupported image format";
+			Log("ResourceManager::LoadTexture") << filename << "Unsupported image format" << SDL_GetPixelFormatName(surf->format);
 	}
 
 	if (surf->format == SDL_PIXELFORMAT_RGBA32 && SDL_GetSurfaceColorspace(surf) == SDL_COLORSPACE_SRGB)
@@ -98,10 +98,11 @@ Texture ResourceManager::LoadTexture(std::string_view filename)
 		.usage = Texture::Usage::SHADER_READ,
 		.levels = 1,
 		.pixels = surf->pixels,
+		.generate_mipmaps = false,
 	};
 
-	Texture result = device ? device->CreateTexture(desc) : device2->CreateTexture(desc, false);
-	device2->SetDebugName(result, std::string(filename).c_str());
+	Texture result = device ? device->CreateTexture(desc) : device2->CreateTexture(std::string(filename), desc);
+	//device2->SetDebugName(result, std::string(filename).c_str());
 	SDL_DestroySurface(surf);
 
 	return result;
@@ -140,10 +141,26 @@ Mesh ResourceManager::LoadMesh(std::string_view filename)
 		material_name.resize(name_length);
 		mesh_file.Read(material_name.data(), name_length);
 
-		Texture tex = LoadTexture(material_name);
-		Material *mat = new Material(tex);
+		if (version == 1)
+		{
+			Log("ResourceManager::LoadMesh") << "Version 1 unimplemented";
+		}
 
-		surfaces[i] = { { vertex_start, vertex_count }, mat, 0 };
+		if (version == 2)
+		{
+			Texture tex_d = LoadTexture(material_name);
+			Material *mat = new Material(tex_d);
+			surfaces[i] = { { vertex_start, vertex_count }, mat, 0 };
+		}
+
+		if (version == 3)
+		{
+			Texture tex_d = LoadTexture(material_name + "_d.png");
+			Texture tex_n = LoadTexture(material_name + "_local.png");
+			Texture tex_s = LoadTexture(material_name + "_s.png");
+			PhongMaterial *mat = new PhongMaterial(tex_d, tex_n, tex_s);
+			surfaces[i] = { { vertex_start, vertex_count }, mat, 0 };
+		}
 	}
 
 	uint32_t vertex_stride, vertex_count;

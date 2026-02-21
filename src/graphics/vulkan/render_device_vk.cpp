@@ -83,9 +83,9 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 		.usage = Texture::Usage::DEPTH_ATTACHMENT,
 		.levels = 1,
 		.pixels = nullptr,
+		.generate_mipmaps = false,
 	};
-	Texture depth_texture_handle = CreateTexture(depth_texture_desc, false);
-	SetDebugName(depth_texture_handle, "Depth Texture");
+	Texture depth_texture_handle = CreateTexture("Backbuffer Depth Texture", depth_texture_desc);
 	vk->depth_texture = store->textures.at(depth_texture_handle.handle);
 	vk->depth_texture_fffuuu = depth_texture_handle;
 
@@ -438,13 +438,22 @@ Shader RenderDeviceVK::LoadShader(Shader::Type type, const std::string &name)
 	return Shader(store->shader_modules.size() - 1, type);
 }
 
-PipelineID RenderDeviceVK::CreatePipeline(const char *name, const PipelineDesc &desc)
+PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const PipelineDesc &desc)
 {
 	vk::Pipeline pipeline;
 
 	pipeline.layout = vk::CreatePipelineLayout(vk->device,
 		{ &store->shader_reflection[desc.shaders[0].handle], &store->shader_reflection[desc.shaders[1].handle] },
 		pipeline.decriptor_set_layouts, 0);
+
+	//if (name == "deferred/static_meshes")
+	//	std::terminate();
+
+	for (size_t i = 0; i < pipeline.decriptor_set_layouts.size(); i++)
+	{
+		vk->SetObjectName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, pipeline.decriptor_set_layouts[i],
+						  fmt::format("{} {}", name, i).c_str());
+	}
 
 	vk::GraphicsPipelineBuilder builder(vk->device);
 	builder.SetTopology(desc.topology);
@@ -467,7 +476,7 @@ PipelineID RenderDeviceVK::CreatePipeline(const char *name, const PipelineDesc &
 	if (pipeline.pipeline == VK_NULL_HANDLE)
 		return {};
 
-	vk->SetObjectName(VK_OBJECT_TYPE_PIPELINE, pipeline.pipeline, name);
+	vk->SetObjectName(VK_OBJECT_TYPE_PIPELINE, pipeline.pipeline, name.c_str());
 
 	store->pipelines.push_back(pipeline);
 	return { { uint32_t(store->pipelines.size() - 1) } };
@@ -589,20 +598,22 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 	}*/
 
 	// TODO: implement clear_flags
-	VkImageView color_image_view, depth_image_view;
+	std::vector<VkImageView> color_image_views;
+	VkImageView depth_image_view;
 	uint32_t width, height;
 
 	if (framebuffer_id)
 	{
 		Framebuffer framebuffer = store->framebuffers[framebuffer_id.handle];
-		color_image_view = store->textures[framebuffer.color_textures[0].handle].image_view;
+		for (auto &texture: framebuffer.color_textures)
+			color_image_views.push_back(store->textures[texture.handle].image_view);
 		depth_image_view = store->textures[framebuffer.depth_texture.handle].image_view;
 		width = framebuffer.width;
 		height = framebuffer.height;
 	}
 	else
 	{
-		color_image_view = vk->frames[vk->image_index].texture.image_view;
+		color_image_views.push_back(vk->frames[vk->image_index].texture.image_view);
 		depth_image_view = vk->depth_texture.image_view;
 		width = vk->width;
 		height = vk->height;
@@ -612,19 +623,25 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 	if (clear_flags == RenderPass::Clear::COLOR)
 		depth_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
 
-	VkRenderingAttachmentInfo color_attachment =
+	std::vector<VkRenderingAttachmentInfo> color_attachments(color_image_views.size());
+	for (size_t i = 0; i < color_image_views.size(); i++)
 	{
-		.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-		.pNext = nullptr,
-		.imageView = color_image_view, //store->textures[framebuffer.color_textures[0].handle].image_view,
-		.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		.resolveMode = VK_RESOLVE_MODE_NONE,
-		.resolveImageView = VK_NULL_HANDLE,
-		.resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, // VK_ATTACHMENT_LOAD_OP_DONT_CARE
-		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-		.clearValue = { .color = vk->clear_color },
-	};
+		VkRenderingAttachmentInfo color_attachment =
+		{
+			.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+			.pNext = nullptr,
+			.imageView = color_image_views[i],
+			.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			.resolveMode = VK_RESOLVE_MODE_NONE,
+			.resolveImageView = VK_NULL_HANDLE,
+			.resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, // VK_ATTACHMENT_LOAD_OP_DONT_CARE
+			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.clearValue = { .color = vk->clear_color },
+		};
+
+		color_attachments[i] = color_attachment;
+	}
 
 	VkRenderingAttachmentInfo depth_attachment =
 	{
@@ -649,8 +666,8 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 		.renderArea = { { 0, 0 }, { width, height } },
 		.layerCount = 1,
 		.viewMask = 0,
-		.colorAttachmentCount = 1,
-		.pColorAttachments = &color_attachment,
+		.colorAttachmentCount = uint32_t(color_attachments.size()),
+		.pColorAttachments = color_attachments.data(),
 		.pDepthAttachment = &depth_attachment,
 		.pStencilAttachment = nullptr
 	};
@@ -690,7 +707,7 @@ bool RenderDeviceVK::EndFrame()
 	if (stop)
 		return false;
 
-	LayoutTransition({}, ImageLayout::COLOR_ATTACHMENT, ImageLayout::PRESENT);
+	//LayoutTransition({}, ImageLayout::COLOR_ATTACHMENT, ImageLayout::PRESENT);
 
 	vkEndCommandBuffer(vk->current_command_buffer);
 
@@ -772,8 +789,9 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 	}
 	else
 	{
-		if (texture.prev_layout == to)
-			return;
+		// move prev_layout to vk::Texture
+		//if (texture.prev_layout == to) // FIXME: does queue transfer has same layout? need to check
+		//	return;
 
 		vk_texture = store->textures[texture.handle];
 
@@ -879,7 +897,7 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 
 	vkCmdPipelineBarrier2(vk->current_command_buffer, &dependency_info);
 
-	texture.prev_layout = to;
+	//texture.prev_layout = to;
 }
 
 GPUBuffer RenderDeviceVK::CreateBuffer(GPUBuffer::Type type, uint32_t size)
@@ -935,8 +953,11 @@ GPUBuffer RenderDeviceVK::CreateBuffer(GPUBuffer::Type type, uint32_t size)
 		throw;
 	}
 
+	//if (size != memory_req.size)
+	//	Log() << "Size mismatch" << size << memory_req.size;
+
 	store->buffers.push_back({ buffer, device_memory });
-	return { { uint32_t(store->buffers.size() - 1) }, uint32_t(memory_req.size), type };
+	return { { uint32_t(store->buffers.size() - 1) }, uint32_t(size), type };
 }
 
 void RenderDeviceVK::UpdateBuffer(GPUBuffer buffer, uint32_t size, const void *data, uint32_t offset)
@@ -1087,7 +1108,7 @@ void RenderDeviceVK::SetUniform2i(std::array<int, 2> values)
 						0, sizeof(int) * values.size(), values.data());
 }*/
 
-Texture RenderDeviceVK::CreateTexture(const TextureDesc &desc, bool generate_mipmaps)
+Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc &desc)
 {
 	VkImageUsageFlags usage_flags = 0;
 	if (uint32_t(desc.usage & Texture::Usage::SHADER_READ))
@@ -1129,7 +1150,7 @@ Texture RenderDeviceVK::CreateTexture(const TextureDesc &desc, bool generate_mip
 
 	VkImage image;
 	vkCreateImage(vk->device, &image_ci, nullptr, &image);
-	//vk->SetObjectName(VK_OBJECT_TYPE_IMAGE, image, "UNIMPLEMENTED");
+	vk->SetObjectName(VK_OBJECT_TYPE_IMAGE, image, name.c_str());
 
 	VkMemoryRequirements memory_req;
 	vkGetImageMemoryRequirements(vk->device, image, &memory_req);
@@ -1258,7 +1279,7 @@ FramebufferID RenderDeviceVK::CreateFramebuffer(const FramebufferDesc &desc)
 		//framebuffer.color_textures[i] = CreateTexture(texture_desc, false);
 		framebuffer.color_textures[i] = desc.color_textures[i],
 		framebuffer.color_formats[i] = desc.color_textures[i].format;
-		SetDebugName(framebuffer.color_textures[i], "Color Render Target"); // TODO: better name
+		//SetDebugName(framebuffer.color_textures[i], "Color Render Target"); // TODO: better name
 	}
 
 	//texture_desc.format = desc.depth_format;
@@ -1267,7 +1288,7 @@ FramebufferID RenderDeviceVK::CreateFramebuffer(const FramebufferDesc &desc)
 	//Texture depth_texture = CreateTexture(texture_desc, false);
 	//framebuffer.depth_texture = CreateTexture(texture_desc, false);
 	framebuffer.depth_texture = desc.depth_texture,
-	SetDebugName(framebuffer.depth_texture, "Depth Render Target");
+	//SetDebugName(framebuffer.depth_texture, "Depth Render Target");
 
 	store->framebuffers.push_back(framebuffer);
 	return { uint32_t(store->framebuffers.size() - 1) };
@@ -1289,10 +1310,10 @@ Texture RenderDeviceVK::GetDepthTexture()
 	vk->depth_texture_fffuuu = depth_texture;
 }*/
 
-void RenderDeviceVK::SetDebugName(Texture texture, const char *name)
+/*void RenderDeviceVK::SetDebugName(Texture texture, const char *name)
 {
 	vk->SetObjectName(VK_OBJECT_TYPE_IMAGE, store->textures.at(texture.handle).image, name);
-}
+}*/
 
 void RenderDeviceVK::SetTrackedResource(Texture texture)
 {

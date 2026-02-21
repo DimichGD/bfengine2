@@ -2,6 +2,7 @@
 #include "entities/transform.hpp"
 #include "graphics/opengl/render_device_gl.hpp"
 #include "graphics/render_paths/debug_render_path.hpp"
+#include "graphics/render_paths/point_light_render_path.hpp"
 #include "graphics/vulkan/render_device_vk.hpp"
 #include "graphics/render_paths/deferred_render_path.hpp"
 #include "io/file.hpp"
@@ -10,9 +11,9 @@
 #include "core/log.hpp"
 #include "ui/font.hpp"
 #include "utils/utf8.hpp"
-#include <SDL2/SDL_gamecontroller.h>
-#include <SDL2/SDL_scancode.h>
-#include <SDL2/SDL_timer.h>
+#include <SDL3/SDL_gamepad.h>
+#include <SDL3/SDL_scancode.h>
+#include <SDL3/SDL_timer.h>
 #include <fmt/format.h>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -20,248 +21,9 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/intersect.hpp>
 #include <glm/gtx/projection.hpp>
-#include <iostream>
-#include <map>
 #include <vector>
 
 using namespace bf;
-
-class Input: public InputHandler
-{
-public:
-	Input()
-	{
-		std::fill(keys.begin(), keys.end(), {});
-	}
-
-	void KeyDown(uint32_t key) override
-	{
-		kbm = true;
-
-		keys[key].just_pressed = 1;
-		//keys[key].just_released = 0;
-		keys[key].pressed = 1;
-
-		auto it = std::find_if(actions2.begin(), actions2.end(), [key](const Action2 &n)
-		{
-			return n.key == key;
-		});
-
-		if (it != actions2.end())
-			it->func();
-	}
-
-	void KeyUp(uint32_t key) override
-	{
-		kbm = true;
-
-		//keys[key].just_pressed = 0;
-		keys[key].just_released = 1;
-		keys[key].pressed = 0;
-	}
-
-	void MouseMove(float x, float y, float dx, float dy) override
-	{
-		mouse_delta.x += dx;
-		mouse_delta.y += dy;
-		mouse_pos.x = x;
-		mouse_pos.y = y;
-	}
-
-	void GamepadAxis(int axis, int value) override
-	{
-		kbm = false;
-
-		switch (axis)
-		{
-			case SDL_CONTROLLER_AXIS_LEFTX: left_stick.x = value / 32767.0f; break;
-			case SDL_CONTROLLER_AXIS_LEFTY: left_stick.y = value / 32767.0f; break;
-			case SDL_CONTROLLER_AXIS_RIGHTX: right_stick.x = value / 32767.0f; break;
-			case SDL_CONTROLLER_AXIS_RIGHTY: right_stick.y = value / 32767.0f; break;
-		}
-	}
-
-	void Flush()
-	{
-		mouse_delta = {};
-
-		for (int i = 0; i < SDL_NUM_SCANCODES; i++)
-		{
-			keys[i].just_pressed = 0;
-			keys[i].just_released = 0;
-		}
-	}
-
-	int8_t KeyPressed(uint32_t key)
-	{
-		return keys[key].pressed;
-	}
-
-	int8_t KeyJustPressed(uint32_t key)
-	{
-		return keys[key].just_pressed;
-	}
-
-	int8_t KeyJustReleased(uint32_t key)
-	{
-		return keys[key].just_released;
-	}
-
-	const glm::vec2 MousePos() const
-	{
-		return mouse_pos;
-	}
-
-	const glm::vec2 MouseRelativePos() const
-	{
-		return mouse_delta;
-	}
-
-	bool IsKBM() const
-	{
-		return kbm;
-	}
-
-	void BindAction(uint32_t key, std::function<void()> func)
-	{
-		actions2.push_back({ key, func });
-	}
-
-	const glm::vec2 LeftStick() const
-	{
-		return left_stick;
-	}
-
-	const glm::vec2 RightStick() const
-	{
-		return right_stick;
-	}
-
-private:
-	struct KeyState
-	{
-		uint8_t pressed: 1 = 0;
-		uint8_t just_pressed: 1 = 0;
-		uint8_t just_released: 1 = 0;
-	};
-
-	bool kbm = true;
-
-	glm::vec2 mouse_delta {};
-	glm::vec2 mouse_pos {};
-	std::array<KeyState, SDL_NUM_SCANCODES> keys;
-
-	glm::vec2 left_stick {};
-	glm::vec2 right_stick {};
-
-	struct Action2
-	{
-		uint32_t key;
-		std::function<void()> func;
-	};
-
-	std::vector<Action2> actions2;
-};
-
-class PlayerController2
-{
-public:
-	void Create(/*MotionState *state*/)
-	{
-		/*this->state = state;
-		this->view_index = state->Allocate();
-		state->GetTransform(view_index).pos = glm::vec3(0.0f, 0.0f, 4.0f);*/
-	}
-
-	void Update(Transform &transform, Input &input, float dt)
-	{
-		float move_speed = 5.0f;
-		float turn_speed = 5.0f;
-
-		float dx, dz, yaw, pitch;
-
-		/*float dx = (input.KeyPressed(KEY_MOVE_RIGHT) - input.KeyPressed(KEY_MOVE_LEFT)) * move_speed * dt;
-		float dz = (input.KeyPressed(KEY_MOVE_BACKWARD) - input.KeyPressed(KEY_MOVE_FORWARD)) * move_speed * dt;
-		float yaw = input.MouseRelativePos().x * turn_speed * dt;
-		float pitch = input.MouseRelativePos().y * turn_speed * dt;*/
-
-		if (input.IsKBM())
-		{
-			dx = (input.KeyPressed(KEY_MOVE_RIGHT) - input.KeyPressed(KEY_MOVE_LEFT)) * move_speed * dt;
-			dz = (input.KeyPressed(KEY_MOVE_BACKWARD) - input.KeyPressed(KEY_MOVE_FORWARD)) * move_speed * dt;
-			yaw = input.MouseRelativePos().x * turn_speed * dt;
-			pitch = input.MouseRelativePos().y * turn_speed * dt;
-		}
-		else
-		{
-			dx = input.LeftStick().x * move_speed * dt;
-			dz = input.LeftStick().y * move_speed * dt;
-			yaw = input.RightStick().x * turn_speed * dt * 20.0f;
-			pitch = input.RightStick().y * turn_speed * dt * 20.0f;
-		}
-
-		glm::quat qx = glm::angleAxis(glm::radians(-yaw), glm::vec3(0.0f, 1.0f, 0.0f));
-		glm::quat qy = glm::angleAxis(glm::radians(-pitch), glm::vec3(1.0f, 0.0f, 0.0f));
-		transform.rot = qx * transform.rot * qy;
-		transform.pos += transform.rot * glm::vec3(1.0f, 0.0f, 0.0f) * dx;
-		transform.pos += transform.rot * glm::vec3(0.0f, 0.0f, 1.0f) * dz;
-
-		if (input.KeyJustPressed(SDL_SCANCODE_E))
-			Log() << "E pressed";
-
-		if (input.KeyJustReleased(SDL_SCANCODE_E))
-			Log() << "E released";
-	}
-
-private:
-	uint32_t KEY_MOVE_LEFT = SDL_SCANCODE_A;
-	uint32_t KEY_MOVE_RIGHT = SDL_SCANCODE_D;
-	uint32_t KEY_MOVE_FORWARD = SDL_SCANCODE_W;
-	uint32_t KEY_MOVE_BACKWARD = SDL_SCANCODE_S;
-};
-
-class Gameplay
-{
-public:
-	void Create()
-	{
-		//view_index = state->Allocate();
-		//state->GetTransform(view_index).pos = glm::vec3(0.0f, 0.0f, 4.0f);
-		view_transform.pos = glm::vec3(0.0f, 0.0f, 4.0f);
-		controller.Create(/*state*/);
-	}
-
-	void FixedUpdate(float dt)
-	{
-		/*float move_speed = 0.005f;
-		float turn_speed = 5.0f;
-
-		float dx = (input.Action("move_right") - input.Action("move_left")) * move_speed * dt;
-		float dz = (input.Action("move_backward") - input.Action("move_forward")) * move_speed * dt;
-		float yaw = (input.Action("turn_right") - input.Action("turn_left")) * turn_speed * dt;
-		float pitch = (input.Action("turn_up") - input.Action("turn_down")) * turn_speed * dt;
-		controller.Update(state->GetTransform(view_index), dx, dz, pitch, yaw);*/
-		//controller.Update(state->GetTransform(view_index), input, dt);
-
-
-	}
-
-	void Update(float dt)
-	{
-		controller.Update(view_transform, input, dt);
-	}
-
-//private:
-	Input input;
-	PlayerController2 controller;
-
-	//MotionState *state = nullptr;
-	//size_t view_index = 0;
-	Transform view_transform;
-
-	//std::span<const uint8_t> keyboard_state;
-	//bool kbm = true;
-};
 
 struct Vertex3D
 {
@@ -356,21 +118,9 @@ int main()
 
 	ResourceManager resources(&device2, &fs);
 
-	/*FramebufferDesc fbo_desc
-	{
-		.width = cfg.window.width,
-		.height = cfg.window.height,
-		.color_texture_count = 1,
-		.color_format = Texture::Format::BGRA8,
-		.depth_format = Texture::Format::D24S8,
-	};
-	FramebufferID fbo = device2.CreateFramebuffer(fbo_desc);*/
-
 	Shader vs4 = device2.LoadShader(Shader::Type::VERTEX, "ui/vk_texture");
 	Shader fs4 = device2.LoadShader(Shader::Type::FRAGMENT, "ui/vk_texture");
 
-	//Shader vs4 = resources.LoadShader(Shader::Type::VERTEX, "ui/vk_texture_vert.glsl");
-	//Shader fs4 = resources.LoadShader(Shader::Type::FRAGMENT, "ui/vk_texture_frag.glsl");
 	PipelineDesc desc4
 	{
 		.shaders = { vs4, fs4 },
@@ -385,55 +135,12 @@ int main()
 	};
 	PipelineID pipeline_ui = device2.CreatePipeline("ui", desc4);
 
-	/*File vs_file2("../../data/shaders/forward/vk_texture_vert.glsl");
-	File fs_file2("../../data/shaders/forward/vk_texture_frag.glsl");
-	vs_file2.Open();
-	fs_file2.Open();
-	auto vs_source2 = vs_file2.Read();
-	auto fs_source2 = fs_file2.Read();
-	Shader vs2 = device2.CreateShader("forward/vk_texture_vert.glsl", Shader::Type::VERTEX, vs_source2);
-	Shader fs2 = device2.CreateShader("forward/vk_texture_frag.glsl", Shader::Type::FRAGMENT, fs_source2);*/
-
-	//Shader vs3 = resources.LoadShader(Shader::Type::VERTEX, "forward/vk_line_vert.glsl");
-	//Shader fs3 = resources.LoadShader(Shader::Type::FRAGMENT, "forward/vk_line_frag.glsl");
-	/*Shader vs3 = device2.LoadShader(Shader::Type::VERTEX, "forward/vk_line");
-	Shader fs3 = device2.LoadShader(Shader::Type::FRAGMENT, "forward/vk_line");
-
-	PipelineDesc desc3
-	{
-		.shaders = { vs3, fs3 },
-		.topology = Topology::LINES,
-		.vertex_attribs = Vertex::Attrib::POSITION,
-		.raster = {},
-		.framebuffer_id = {}, // Should be fbo?
-	};
-	PipelineID pipeline3 = device2.CreatePipeline("lines", desc3);*/
 
 	auto grid_verts = GenerateGrid(32.0f, 2.0f);
 	GPUBuffer grid_vbo = device2.CreateBuffer(GPUBuffer::VERTEX, grid_verts);
 	//GPUBuffer grid_vbo = device2.CreateBuffer(GPUBuffer::VERTEX, sizeof(Vertex3D) * grid_verts.size());
 	//device2.UpdateBuffer(grid_vbo, sizeof(Vertex3D) * grid_verts.size(), grid_verts.data(), 0);
 
-	/*PipelineDesc desc2
-	{
-		.shaders = { vs2, fs2 },
-		.topology = Topology::TRIANGLES,
-		.vertex_attribs = Vertex::Attrib::POSITION | Vertex::Attrib::TEXCOORD_0,
-		.raster = {},
-		.framebuffer_id = fbo,
-	};
-	PipelineID pipeline2 = device2.CreatePipeline("meshes", desc2);*/
-
-	/*std::vector<float> quad_verts
-	{
-		-1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-		-1.0f, -1.0f, 0.0f, 0.0f, 1.0f,
-		1.0f, 1.0f, 0.0, 1.0f, 0.0f,
-
-		-1.0f, -1.0f, 0.0f, 0.0f, 1.0f,
-		1.0f, 1.0f, 0.0, 1.0f, 0.0f,
-		1.0f, -1.0f, 0.0, 1.0f, 1.0f,
-	};*/
 
 	float width = cfg.window.width;
 	float height = cfg.window.height;
@@ -452,7 +159,8 @@ int main()
 	GPUBuffer quad_vbo = device2.CreateBuffer(GPUBuffer::VERTEX, quad_verts);
 
 	Transform view_transform;
-	view_transform.pos = glm::vec3(0.0f, 0.0f, 4.0f);
+	view_transform.pos = glm::vec3(5.0f, 4.0f, 10.0f);
+	view_transform.rot = glm::quat(glm::vec3(glm::radians(-30.0f), glm::radians(30.0f), 0.0f));
 	glm::mat4 proj = glm::perspectiveFovZO(glm::radians(80.0f), float(width), float(height), 0.1f, 100.0f);
 
 	GPUBuffer camera_ubo = device2.CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4) * 2);
@@ -465,7 +173,7 @@ int main()
 	//device2.WriteDescriptor(pipeline2, material_set, 0, tex);
 
 	std::vector<glm::mat4> matrices(32, glm::mat4(1.0f));
-	matrices[1] = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -2.0f, 0.0f));
+	matrices[1] = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -4.0f, 0.0f));
 	GPUBuffer matrices_ubo = device2.CreateBuffer(GPUBuffer::UNIFORM, matrices);
 
 	/*uint32_t scene_set = device2.CreateDescriptorSet(pipeline2, Descriptor2::Set::SCENE);
@@ -482,41 +190,31 @@ int main()
 
 	GPUBuffer colors_ubo = device2.CreateBuffer(GPUBuffer::UNIFORM, colors);
 
-	/*GPUBuffer colors_ubo = device2.CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::vec4) * colors.size());
-	device2.UpdateBuffer(colors_ubo, sizeof(glm::vec4) * colors.size(), colors.data(), 0);*/
+	std::vector<glm::vec4> point_lights
+	{
+		{ 0.0f, 0.0f, 0.0f, 8.0f },
+	};
 
-	/*DescriptorSet scene_set2 = device2.CreateDescriptorSet(pipeline3, Descriptor2::Set::SCENE);
-	device2.WriteDescriptor(scene_set2, 0, camera_ubo);
-	device2.WriteDescriptor(scene_set2, 1, matrices_ubo);
-	device2.WriteDescriptor(scene_set2, 2, colors_ubo);*/
+	GPUBuffer point_lights_ubo = device2.CreateBuffer(GPUBuffer::UNIFORM, point_lights);
+	GPUBuffer camera_pos_ubo = device2.CreateBuffer(GPUBuffer::UNIFORM, sizeof(float) * 3);
 
-	/*uint32_t scene_set3 = device2.CreateDescriptorSet(pipeline3, Descriptor2::Set::SCENE);
-	device2.WriteDescriptor(pipeline3, scene_set3, 0, camera_ubo);
-	device2.WriteDescriptor(pipeline3, scene_set3, 1, matrices_ubo);*/
-
-	//std::vector<Surface> surfaces;
 	std::vector<Mesh> meshes;
-
-	/*File cubes_mesh_file("C:/Users/Dimich/Projects/bfengine2/data/models/cubes.bin");
-	cubes_mesh_file.Open();
-	uint32_t magic, version, surface_count;
-	cubes_mesh_file.Read(&magic);
-	cubes_mesh_file.Read(&version);
-	cubes_mesh_file.Read(&surface_count);*/
-	//Log() << version << FOUR_CC("BFMS");
-
-	//uint32_t material_set = device2.CreateDescriptorSet(pipeline2, Descriptor2::Set::MATERIAL);
 
 	GraphicsContext graphics_context
 	{
 		.active_camera_ubo = camera_ubo,
 		.model_matrices_ubo = matrices_ubo,
 		.colors_ubo = colors_ubo,
+		.point_lights_ubo = point_lights_ubo,
+		.camera_pos_ubo = camera_pos_ubo,
 	};
 	Deferred deferred(&device2, &cfg, &resources);
 	deferred.Create(&graphics_context);
 	//device2.SetDepthTexture(deferred.GetDepthTexture());
 	device2.SetTrackedResource(device2.GetDepthTexture());
+
+	PointLightRenderPath point_light_rp(&device2, &cfg, &resources);
+	point_light_rp.Create(&graphics_context, deferred.GetColorTextures());
 
 	Debug debug(&device2, &cfg, &resources);
 	debug.Create(&graphics_context);
@@ -571,7 +269,7 @@ int main()
 	uint32_t max_time = 0;
 
 	//device2.Test();
-	Mesh grid_mesh { { { { 0, uint32_t(grid_verts.size()) }, nullptr, 3 } }, grid_vbo, 0 };
+	Mesh grid_mesh { { { { 0, uint32_t(grid_verts.size()) }, nullptr, 3 } }, grid_vbo, 1 };
 	std::vector<Mesh> meshes2;
 	meshes2.push_back(grid_mesh);
 
@@ -579,7 +277,8 @@ int main()
 	meshes3.push_back(resources.LoadMesh("sphere.bin"));
 	meshes3[0].matrix_index = 2;
 
-	wnd.CaptureMouse(true);
+	bool capture_mouse = true;
+	wnd.CaptureMouse(capture_mouse);
 	Input input;
 	while (wnd.Update(input))
 	{
@@ -589,6 +288,13 @@ int main()
 		if (input.KeyJustPressed(SDL_SCANCODE_ESCAPE))
 			wnd.Close();
 
+		if (input.KeyJustPressed(SDL_SCANCODE_E))
+		{
+			capture_mouse = !capture_mouse;
+			wnd.CaptureMouse(capture_mouse);
+			// if not capture, move cursor to center?
+		}
+
 		float move_speed = 5.0f;
 		float turn_speed = 5.0f;
 		float dt = 1.0f / 60.0f;
@@ -597,8 +303,11 @@ int main()
 		uint32_t KEY_MOVE_RIGHT = SDL_SCANCODE_D;
 		uint32_t KEY_MOVE_FORWARD = SDL_SCANCODE_W;
 		uint32_t KEY_MOVE_BACKWARD = SDL_SCANCODE_S;
+		uint32_t KEY_MOVE_UP = SDL_SCANCODE_SPACE;
+		uint32_t KEY_MOVE_DOWN = SDL_SCANCODE_LCTRL;
 
 		float dx = (input.KeyPressed(KEY_MOVE_RIGHT) - input.KeyPressed(KEY_MOVE_LEFT)) * move_speed * dt;
+		float dy = (input.KeyPressed(KEY_MOVE_UP) - input.KeyPressed(KEY_MOVE_DOWN)) * move_speed * dt;
 		float dz = (input.KeyPressed(KEY_MOVE_BACKWARD) - input.KeyPressed(KEY_MOVE_FORWARD)) * move_speed * dt;
 		float yaw = input.MouseRelativePos().x * turn_speed * dt;
 		float pitch = input.MouseRelativePos().y * turn_speed * dt;
@@ -611,11 +320,15 @@ int main()
 			pitch = input.RightStick().y * turn_speed * dt * 20.0f;
 		}
 
-		glm::quat qx = glm::angleAxis(glm::radians(-yaw), glm::vec3(0.0f, 1.0f, 0.0f));
-		glm::quat qy = glm::angleAxis(glm::radians(-pitch), glm::vec3(1.0f, 0.0f, 0.0f));
-		view_transform.rot = qx * view_transform.rot * qy;
+		if (capture_mouse)
+		{
+			glm::quat qx = glm::angleAxis(glm::radians(-yaw), glm::vec3(0.0f, 1.0f, 0.0f));
+			glm::quat qy = glm::angleAxis(glm::radians(-pitch), glm::vec3(1.0f, 0.0f, 0.0f));
+			view_transform.rot = qx * view_transform.rot * qy;
+		}
 		view_transform.pos += view_transform.rot * glm::vec3(1.0f, 0.0f, 0.0f) * dx;
 		view_transform.pos += view_transform.rot * glm::vec3(0.0f, 0.0f, 1.0f) * dz;
+		view_transform.pos += glm::vec3(0.0f, dy, 0.0f);
 		input.Flush();
 
 		glm::mat4 view = glm::mat4_cast(glm::normalize(view_transform.rot));
@@ -623,20 +336,27 @@ int main()
 		FastInverse(view);
 		uint32_t stride = sizeof(glm::mat4);
 		device2.UpdateBuffer(camera_ubo, stride, glm::value_ptr(view), stride);
+		device2.UpdateBuffer(camera_pos_ubo, stride, glm::value_ptr(view_transform.pos), 0);
 
 		// mouse picking
 
-		//glm::vec3 win_coords = glm::vec3(input.MousePos().x, height - input.MousePos().y, 1.0f);
-		glm::vec3 win_coords = glm::vec3(width * 0.5f, height - height * 0.5f, 1.0f);
-		glm::vec4 viewport = glm::vec4(0.0f, 0.0f, width, height);
-		glm::vec3 result = glm::unProject(win_coords, view, proj, viewport);
-		//glm::vec3 dir = glm::normalize(result - glm::vec3(10.0f, 10.0f, 10.0f));
-		glm::vec3 dir = glm::normalize(result - view_transform.pos);
+		glm::vec3 dir;
+		if (capture_mouse)
+		{
+			dir = view_transform.rot * glm::vec3(0.0f, 0.0f, -1.0f);
+		}
+		else
+		{
+			glm::vec3 win_coords = glm::vec3(input.MousePos().x, height - input.MousePos().y, 1.0f);
+			glm::vec4 viewport = glm::vec4(0.0f, 0.0f, width, height);
+			glm::vec3 result = glm::unProject(win_coords, view, proj, viewport);
+			dir = glm::normalize(result - view_transform.pos);
+		}
 
 		glm::vec3 sphere_pos(0.0f);
 		glm::vec3 orig = view_transform.pos; //glm::vec3(10.0f, 10.0f, 10.0f);
 		//glm::vec3 dir = glm::normalize(-orig);
-		glm::vec3 plane_orig = glm::vec3(0.0f);
+		glm::vec3 plane_orig = glm::vec3(0.0f, -4.0f, 0.0f);
 		glm::vec3 plane_normal = glm::vec3(0.0f, 1.0f, 0.0f);
 		float dist;
 		if (glm::intersectRayPlane(orig, dir, plane_orig, plane_normal, dist))
@@ -652,68 +372,42 @@ int main()
 		start_time = SDL_GetTicks();
 		device2.BeginFrame();
 
-		//device2.BeginRenderPass({ glm::ivec2 {}, wnd.Size() }, RenderPass::Clear::COLOR_DEPTH);
-		//device2.LayoutTransition(device2.GetFramebuffer(fbo).color_textures[0], ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT, false);
-		//device2.LayoutTransition(device2.GetFramebuffer(fbo).depth_texture, ImageLayout::UNDEFINED, ImageLayout::DEPTH_STENCIL_ATTACHMENT, true);
-		/*device2.BeginRenderPass(fbo, RenderPass::Clear::COLOR_DEPTH);
-		device2.SetViewport({ glm::ivec2 {}, glm::ivec2 { width, height } });
-
-		device2.BindPipeline(pipeline2);
-		device2.BindDescriptorSet(Descriptor2::Set::SCENE, scene_set);
-		device2.BindDescriptorSet(Descriptor2::Set::MATERIAL, material_set);
-
-		device2.BindVertexBuffer(cubes_vbo);
-		for (auto &surf: surfaces)
-		{
-			device2.Push(Shader::Type::VERTEX, 0, 0);
-			device2.Push(Shader::Type::FRAGMENT, 4, surf.texture_index);
-			device2.Draw(surf.vertex_range.start, surf.vertex_range.count);
-		}*/
+		/*device2.LayoutTransition(deferred.GetColorTexture(0), ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
+		device2.LayoutTransition(deferred.GetColorTexture(1), ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
+		device2.LayoutTransition(deferred.GetColorTexture(2), ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);*/
+		for (auto texture: deferred.GetColorTextures())
+			device2.LayoutTransition(texture, ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
+		device2.LayoutTransition(deferred.GetDepthTexture(), ImageLayout::UNDEFINED, ImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
 		deferred.Render(meshes);
 
-		/*device2.BindPipeline(pipeline3);
-		device2.BindDescriptorSet(Descriptor2::Set::SCENE, scene_set2);
-		device2.Push(Shader::Type::VERTEX, 0, 1);
-		device2.Push(Shader::Type::FRAGMENT, 4, 3);
-		device2.BindVertexBuffer(grid_vbo);
-		device2.Draw(0, grid_verts.size());*/
-
-		//device2.EndRenderPass();
-		//device2.EndRenderPass(fbo);
-		//device2.LayoutTransition(device2.GetFramebuffer(fbo).color_textures[0], ImageLayout::COLOR_ATTACHMENT, ImageLayout::SHADER_READ_ONLY, false);
-		//device2.LayoutTransition(device2.GetFramebuffer(fbo).depth_texture, ImageLayout::DEPTH_STENCIL_ATTACHMENT, ImageLayout::SHADER_READ_ONLY, true);
-
-		//device2.LayoutTransition({}, ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT, false);
-		//device2.LayoutTransition({}, ImageLayout::UNDEFINED, ImageLayout::DEPTH_STENCIL_ATTACHMENT, true);
+		/*device2.LayoutTransition(deferred.GetColorTexture(0), ImageLayout::COLOR_ATTACHMENT, ImageLayout::SHADER_READ_ONLY);
+		device2.LayoutTransition(deferred.GetColorTexture(1), ImageLayout::COLOR_ATTACHMENT, ImageLayout::SHADER_READ_ONLY);
+		device2.LayoutTransition(deferred.GetColorTexture(2), ImageLayout::COLOR_ATTACHMENT, ImageLayout::SHADER_READ_ONLY);*/
+		for (auto texture: deferred.GetColorTextures())
+			device2.LayoutTransition(texture, ImageLayout::COLOR_ATTACHMENT, ImageLayout::SHADER_READ_ONLY);
 		device2.LayoutTransition({}, ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
-		device2.BeginRenderPass({}, RenderPass::Clear::COLOR);
-		//device2.SetViewport({ glm::ivec2 {}, wnd.Size() });
 
-		device2.BindPipeline(pipeline_final);
+		device2.BeginRenderPass({}, RenderPass::Clear::COLOR);
+
+		point_light_rp.Render();
+
+		/*device2.BindPipeline(pipeline_final);
 		device2.BindDescriptorSet(Descriptor2::Set::SCENE, scene_set_final);
 		device2.BindDescriptorSet(Descriptor2::Set::MATERIAL, material_set_final);
 		device2.BindVertexBuffer(quad_vbo);
-		device2.Draw(0, 6);
+		device2.Draw(0, 6);*/
 
-		/*device2.BindPipeline(pipeline3);
-		device2.BindDescriptorSet(Descriptor2::Set::SCENE, scene_set2);
-		device2.Push(Shader::Type::VERTEX, 0, 1);
-		device2.Push(Shader::Type::FRAGMENT, 4, 3);
-		device2.BindVertexBuffer(grid_vbo);
-		device2.Draw(0, grid_verts.size());*/
-
-		//device2.EndRenderPass({});
-		//device2.BeginRenderPass({}, RenderPass::Clear::COLOR);
-
-		debug.Render(meshes2, meshes3);
+		meshes2.clear();
+		debug.Render(meshes2, meshes3); // grid, sphere
 
 		device2.BindPipeline(pipeline_ui);
 		device2.BindDescriptorSet(Descriptor2::Set::SCENE, ui_scene_set);
 		device2.BindDescriptorSet(Descriptor2::Set::MATERIAL, ui_material_set);
-		device2.Push(Shader::Type::FRAGMENT, 4, 2);
+		device2.Push(Shader::Type::FRAGMENT, 4, 3);
 
 		std::span<float> text_verts = device2.MapBuffer<float>(text_vbo);
+		//text_string = fmt::format("{} {} {} {}", view_transform.rot.x, view_transform.rot.y, view_transform.rot.z, view_transform.rot.w);
 		text_verts_count = font.MakeString(utf8_view(text_string), text_verts);
 		device2.UnMapBuffer(text_vbo);
 
@@ -721,7 +415,7 @@ int main()
 		device2.Draw(0, text_verts_count);
 
 		device2.EndRenderPass({});
-		//device2.LayoutTransition({}, ImageLayout::COLOR_ATTACHMENT, ImageLayout::PRESENT, false);
+		device2.LayoutTransition({}, ImageLayout::COLOR_ATTACHMENT, ImageLayout::PRESENT);
 
 		if (!device2.EndFrame())
 			break;

@@ -717,17 +717,7 @@ VkPipeline GraphicsPipelineBuilder::Build(VkDevice device, VkPipelineCache pipel
 		.maxDepthBounds = 1.0f
 	};
 
-	VkPipelineColorBlendAttachmentState colorBlendAttachment
-	{
-		.blendEnable = blend_enable,
-		.srcColorBlendFactor = src_color_blend_factor,
-		.dstColorBlendFactor = dst_color_blend_factor,
-		.colorBlendOp = color_blend_op,
-		.srcAlphaBlendFactor = src_alpha_blend_factor,
-		.dstAlphaBlendFactor = dst_alpha_blend_factor,
-		.alphaBlendOp = alpha_blend_op,
-		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-	};
+
 
 	/*VkPipelineColorBlendAttachmentState colorBlendAttachment
 	{
@@ -741,6 +731,24 @@ VkPipeline GraphicsPipelineBuilder::Build(VkDevice device, VkPipelineCache pipel
 		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
 	};*/
 
+	std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments(attachment_formats.size());
+	for (size_t i = 0; i < attachment_formats.size(); i++)
+	{
+		VkPipelineColorBlendAttachmentState color_blend_attachment
+		{
+			.blendEnable = blend_enable,
+			.srcColorBlendFactor = src_color_blend_factor,
+			.dstColorBlendFactor = dst_color_blend_factor,
+			.colorBlendOp = color_blend_op,
+			.srcAlphaBlendFactor = src_alpha_blend_factor,
+			.dstAlphaBlendFactor = dst_alpha_blend_factor,
+			.alphaBlendOp = alpha_blend_op,
+			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+		};
+
+		color_blend_attachments[i] = color_blend_attachment;
+	}
+
 	VkPipelineColorBlendStateCreateInfo color_blend_ci =
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
@@ -748,8 +756,8 @@ VkPipeline GraphicsPipelineBuilder::Build(VkDevice device, VkPipelineCache pipel
 		.flags = 0,
 		.logicOpEnable = VK_FALSE,
 		.logicOp = VK_LOGIC_OP_CLEAR,
-		.attachmentCount = 1,
-		.pAttachments = &colorBlendAttachment,
+		.attachmentCount = uint32_t(color_blend_attachments.size()),
+		.pAttachments = color_blend_attachments.data(),
 		.blendConstants = {}
 	};
 

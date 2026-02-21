@@ -88,7 +88,7 @@ std::vector<uint32_t> CompileShader(const std::string &name, const std::vector<c
 	shaderc_compiler_t compiler = shaderc_compiler_initialize();
 	shaderc_compile_options_t options = shaderc_compile_options_initialize();
 
-	shaderc_compile_options_set_optimization_level(options, shaderc_optimization_level_performance);
+	//shaderc_compile_options_set_optimization_level(options, shaderc_optimization_level_performance);
 	shaderc_compile_options_set_target_env(options, shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_4);
 	shaderc_compilation_result_t compilation_result = shaderc_compile_into_spv(compiler, source.data(), source.size(),
 													shaderc_glsl_infer_from_source, name.c_str(), "main", options);
@@ -122,8 +122,10 @@ uint32_t hash(size_t seed, uint32_t x)
 	return seed;
 }
 
-VkPipelineLayout CreatePipelineLayout(VkDevice device, const std::vector<ShaderReflectionData *> &reflection_data,
-									  std::vector<VkDescriptorSetLayout> &decriptor_set_layouts, VkPipelineLayoutCreateFlags flags)
+VkPipelineLayout CreatePipelineLayout(VkDevice device,
+									  const std::vector<ShaderReflectionData *> &reflection_data,
+									  std::vector<VkDescriptorSetLayout> &decriptor_set_layouts,
+									  VkPipelineLayoutCreateFlags flags)
 {
 	std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> bindings;
 	std::map<uint32_t, uint32_t> hashes;

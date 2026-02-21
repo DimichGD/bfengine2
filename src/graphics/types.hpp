@@ -389,7 +389,6 @@ struct Texture: Handle
 	};
 
 	Format format;
-	ImageLayout prev_layout = ImageLayout::UNDEFINED;
 
 	static bool IsDepth(Format format)
 	{
@@ -438,6 +437,7 @@ struct TextureDesc
 	Texture::Usage usage {};
 	int levels = 0;
 	void *pixels = nullptr;
+	bool generate_mipmaps = false;
 };
 
 struct Framebuffer

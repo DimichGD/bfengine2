@@ -26,7 +26,7 @@ public:
 
 	//Shader CreateShader(const std::string &name, Shader::Type type, const std::vector<char> &source);
 	Shader LoadShader(Shader::Type type, const std::string &name);
-	PipelineID CreatePipeline(const char *name, const PipelineDesc &desc);
+	PipelineID CreatePipeline(const std::string &name, const PipelineDesc &desc);
 	void Test();
 	//void CreatePipelineLayout(const std::map<Descriptor::Set, std::vector<Descriptor>> &descriptors);
 	//void CreatePipelineLayout(const PipelineLayout &layout);
@@ -72,13 +72,13 @@ public:
 	/*void SetUniform1i(int value);
 	void SetUniform2i(std::array<int, 2> values);*/
 
-	Texture CreateTexture(const TextureDesc &desc, bool generate_mipmaps);
+	Texture CreateTexture(const std::string &name, const TextureDesc &desc);
 	FramebufferID CreateFramebuffer(const FramebufferDesc &desc);
 	Framebuffer GetFramebuffer(FramebufferID framebuffer);
 	Texture GetDepthTexture();
 	//void SetDepthTexture(Texture depth_texture);
 
-	void SetDebugName(Texture texture, const char *name);
+	//void SetDebugName(Texture texture, const char *name);
 	void SetTrackedResource(Texture texture);
 	void ResetResourceTransition(Texture texture);
 	void MakeResourceTransition(Texture texture, ImageLayout next_layout);
