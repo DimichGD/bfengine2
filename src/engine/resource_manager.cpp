@@ -88,6 +88,9 @@ Texture ResourceManager::LoadTexture(std::string_view filename)
 	if (surf->format == SDL_PIXELFORMAT_RGBA32 && SDL_GetSurfaceColorspace(surf) == SDL_COLORSPACE_SRGB)
 		format = Texture::Format::SRGBA8;
 
+	if (filename.contains("_local") || filename.contains("_s"))
+		format = Texture::Format::RGBA8;
+
 	//Log() << "Color space srgb" << (SDL_GetSurfaceColorspace(surf) == SDL_COLORSPACE_SRGB);
 
 	TextureDesc desc

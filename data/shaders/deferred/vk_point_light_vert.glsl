@@ -21,13 +21,15 @@ layout(push_constant) uniform Constants
 };
 
 layout(location = 0) out vec2 TEXCOORD_0;
+layout(location = 1) out vec3 POSITION;
 
 void main()
 {
 	TEXCOORD_0 = IN_TEXCOORD_0;
 	gl_Position = /*U_PROJ_MATRIX * U_VIEW_MATRIX * U_MODEL_MATRICES[U_OBJECT_INDEX] **/ vec4(IN_POSITION, 1.0);
+	POSITION = gl_Position.xyz;
 	
 #ifdef VULKAN
-	gl_Position.y = -gl_Position.y;
+	//gl_Position.y = -gl_Position.y;
 #endif
 }

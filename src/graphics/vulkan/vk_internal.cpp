@@ -143,7 +143,8 @@ void RenderDeviceVK::Internal::CreateSurface(SDL_Window *wnd)
 	std::vector<VkSurfaceFormatKHR> formats = Enumerate::SurfaceFormats(phys_device, surface);
 	auto pred = [](const VkSurfaceFormatKHR &format) -> bool
 	{
-		return (format.format == VK_FORMAT_B8G8R8A8_SRGB || format.format == VK_FORMAT_R8G8B8A8_SRGB);
+		// TODO: manual srgb convert?
+		return (format.format == VK_FORMAT_B8G8R8A8_SRGB /*|| format.format == VK_FORMAT_R8G8B8A8_SRGB*/);
 		//return (format.format == VK_FORMAT_B8G8R8A8_UNORM || format.format == VK_FORMAT_R8G8B8A8_UNORM);
 	};
 

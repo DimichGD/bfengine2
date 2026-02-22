@@ -11,7 +11,7 @@ PointLightRenderPath::PointLightRenderPath(RenderDeviceVK *device, Config *confi
 	this->height = config->window.height;
 }
 
-void PointLightRenderPath::Create(GraphicsContext *context, const std::vector<Texture> &textures)
+void PointLightRenderPath::Create(GraphicsContext *context, const std::vector<Texture> &textures, Texture depth_texture, FramebufferID out_fbo)
 {
 	Shader vs = device->LoadShader(Shader::Type::VERTEX, "deferred/vk_point_light");
 	Shader fs = device->LoadShader(Shader::Type::FRAGMENT, "deferred/vk_point_light");
@@ -26,7 +26,7 @@ void PointLightRenderPath::Create(GraphicsContext *context, const std::vector<Te
 			.depth_test = false,
 			.depth_write = false,
 		},
-		.framebuffer_id = {},
+		.framebuffer_id = out_fbo,
 	};
 
 	pipeline = device->CreatePipeline("deferred/point_light", pipeline_desc);
@@ -43,6 +43,7 @@ void PointLightRenderPath::Create(GraphicsContext *context, const std::vector<Te
 	device->WriteDescriptor(material_set, 1, textures[1]);
 	device->WriteDescriptor(material_set, 2, textures[2]);
 	device->WriteDescriptor(material_set, 3, textures[3]);
+	device->WriteDescriptor(material_set, 4, depth_texture);
 
 	/*std::vector<float> quad_verts
 	{
@@ -55,7 +56,7 @@ void PointLightRenderPath::Create(GraphicsContext *context, const std::vector<Te
 		width, height, 0.0, 1.0f, 1.0f,
 	};*/
 
-	std::vector<float> quad_verts
+	/*std::vector<float> quad_verts
 	{
 		-1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
 		-1.0f, -1.0f, 0.0f, 0.0f, 1.0f,
@@ -64,6 +65,17 @@ void PointLightRenderPath::Create(GraphicsContext *context, const std::vector<Te
 		1.0f, 1.0f, 0.0, 1.0f, 0.0f,
 		-1.0f, -1.0f, 0.0f, 0.0f, 1.0f,
 		1.0f, -1.0f, 0.0, 1.0f, 1.0f,
+	};*/
+
+	std::vector<float> quad_verts
+	{
+		-1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+		1.0f, 1.0f, 0.0, 1.0f, 1.0f,
+
+		1.0f, 1.0f, 0.0, 1.0f, 1.0f,
+		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+		1.0f, -1.0f, 0.0, 1.0f, 0.0f,
 	};
 
 	quad_vbo = device->CreateBuffer(GPUBuffer::VERTEX, quad_verts);

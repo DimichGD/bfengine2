@@ -366,6 +366,7 @@ enum class ImageLayout
 	DEPTH,
 	DEPTH_STENCIL_ATTACHMENT,
 	SHADER_READ_ONLY,
+	DEPTH_READ,
 	PRESENT,
 };
 
@@ -435,7 +436,7 @@ struct TextureDesc
 	uint32_t height = 0;
 	Texture::Format format {};
 	Texture::Usage usage {};
-	int levels = 0;
+	uint32_t levels = 0;
 	void *pixels = nullptr;
 	bool generate_mipmaps = false;
 };

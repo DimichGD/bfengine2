@@ -24,21 +24,29 @@ layout(push_constant) uniform Constants
 
 layout(location = 0) out vec2 TEXCOORD_0;
 layout(location = 1) out vec3 POSITION;
-layout(location = 2) out mat3 TBN;
+//layout(location = 2) out mat3 TBN;
 //layout(location = 2) out vec3 NORMAL;
+layout(location = 2) out vec3 NORMAL;
+layout(location = 3) out vec3 BINORMAL;
+layout(location = 4) out vec3 TANGENT;
+//layout(location = 5) out mat3 TBN;
 
 void main()
 {
+	vec4 temp_position = U_MODEL_MATRICES[U_OBJECT_INDEX] * vec4(IN_POSITION, 1.0);
+	
 	TEXCOORD_0 = IN_TEXCOORD_0;
-	//NORMAL = IN_NORMAL;
-	POSITION = vec3(U_MODEL_MATRICES[U_OBJECT_INDEX] * vec4(IN_POSITION, 1.0));
+	POSITION = temp_position.xyz;
 	
-	vec3 binormal = cross(IN_NORMAL, IN_TANGENT.xyz) * IN_TANGENT.w;
-	TBN = mat3(IN_TANGENT.xyz, binormal, IN_NORMAL);
+	//vec3 binormal = cross(IN_NORMAL, IN_TANGENT.xyz) * IN_TANGENT.w;
+	//TBN = mat3(IN_TANGENT.xyz, binormal, IN_NORMAL);
+	NORMAL = IN_NORMAL;
+	BINORMAL = cross(IN_NORMAL, IN_TANGENT.xyz) * IN_TANGENT.w;
+	TANGENT = IN_TANGENT.xyz;
 	
-	gl_Position = U_PROJ_MATRIX * U_VIEW_MATRIX * U_MODEL_MATRICES[U_OBJECT_INDEX] * vec4(IN_POSITION, 1.0);
+	gl_Position = U_PROJ_MATRIX * U_VIEW_MATRIX * temp_position;
 	
 #ifdef VULKAN
-	gl_Position.y = -gl_Position.y;
+	//gl_Position.y = -gl_Position.y;
 #endif
 }

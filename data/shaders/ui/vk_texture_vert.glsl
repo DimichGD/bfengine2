@@ -17,6 +17,6 @@ void main()
 	gl_Position = U_PROJ_MATRIX * vec4(IN_POSITION, 1.0);
 	
 #ifdef VULKAN
-	gl_Position.y = -gl_Position.y;
+	//gl_Position.y = -gl_Position.y;
 #endif
 }

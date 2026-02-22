@@ -12,7 +12,7 @@ public:
 	BF_NON_MOVABLE(PointLightRenderPath)
 	BF_NON_COPYABLE(PointLightRenderPath)
 
-	void Create(GraphicsContext *context, const std::vector<Texture> &textures);
+	void Create(GraphicsContext *context, const std::vector<Texture> &textures, Texture depth_texture, FramebufferID out_fbo);
 	void Destroy();
 	void Render();
 

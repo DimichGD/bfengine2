@@ -11,7 +11,7 @@ Debug::Debug(RenderDeviceVK *device, Config *config, ResourceManager *resources)
 	this->height = config->window.height;
 }
 
-void Debug::Create(GraphicsContext *context)
+void Debug::Create(GraphicsContext *context, FramebufferID out_fbo)
 {
 	this->context = context;
 
@@ -25,8 +25,12 @@ void Debug::Create(GraphicsContext *context)
 		.shaders = { vs_line, fs_line },
 		.topology = Topology::LINES,
 		.vertex_attribs = Vertex::Attrib::POSITION,
-		.raster = {},
-		.framebuffer_id = {},
+		.raster = {
+			.blend = Blend::NONE,
+			.depth_test = true,
+			.depth_write = false,
+		},
+		.framebuffer_id = out_fbo,
 	};
 
 	PipelineDesc pipeline_mesh_desc
@@ -34,8 +38,12 @@ void Debug::Create(GraphicsContext *context)
 		.shaders = { vs_texture, fs_texture },
 		.topology = Topology::TRIANGLES,
 		.vertex_attribs = Vertex::Attrib::POSITION | Vertex::Attrib::TEXCOORD_0,
-		.raster = {},
-		.framebuffer_id = {},
+		.raster = {
+			.blend = Blend::NONE,
+			.depth_test = true,
+			.depth_write = false,
+		},
+		.framebuffer_id = out_fbo,
 	};
 
 	pipeline_lines = device->CreatePipeline("debug/colored_lines", pipeline_line_desc);

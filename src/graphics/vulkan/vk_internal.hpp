@@ -19,6 +19,7 @@ struct Texture
 	VkImage image;
 	VkImageView image_view;
 	VkDeviceMemory memory;
+	VkImageLayout layout;
 };
 
 struct Pipeline
@@ -85,7 +86,7 @@ struct RenderDeviceVK::Internal
 	/*VkImage depth_image = VK_NULL_HANDLE;
 	VkDeviceMemory depth_memory = VK_NULL_HANDLE;
 	VkImageView depth_image_view = VK_NULL_HANDLE;*/
-	vk::Texture depth_texture {};
+	//vk::Texture depth_texture {};
 	bf::Texture depth_texture_fffuuu {};
 	VkClearColorValue clear_color;
 	VkClearDepthStencilValue clear_depth_stencil;

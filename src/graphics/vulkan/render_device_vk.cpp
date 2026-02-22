@@ -80,13 +80,13 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 		.width = vk->width,
 		.height = vk->height,
 		.format = Texture::Format::D24S8,
-		.usage = Texture::Usage::DEPTH_ATTACHMENT,
+		.usage = Texture::Usage::DEPTH_ATTACHMENT | Texture::Usage::SHADER_READ,
 		.levels = 1,
 		.pixels = nullptr,
 		.generate_mipmaps = false,
 	};
 	Texture depth_texture_handle = CreateTexture("Backbuffer Depth Texture", depth_texture_desc);
-	vk->depth_texture = store->textures.at(depth_texture_handle.handle);
+	//vk->depth_texture = store->textures.at(depth_texture_handle.handle);
 	vk->depth_texture_fffuuu = depth_texture_handle;
 
 	VkPhysicalDeviceProperties props;
@@ -600,6 +600,7 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 	// TODO: implement clear_flags
 	std::vector<VkImageView> color_image_views;
 	VkImageView depth_image_view;
+	VkImageLayout depth_layout;
 	uint32_t width, height;
 
 	if (framebuffer_id)
@@ -608,13 +609,15 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 		for (auto &texture: framebuffer.color_textures)
 			color_image_views.push_back(store->textures[texture.handle].image_view);
 		depth_image_view = store->textures[framebuffer.depth_texture.handle].image_view;
+		depth_layout = store->textures[framebuffer.depth_texture.handle].layout;
 		width = framebuffer.width;
 		height = framebuffer.height;
 	}
 	else
 	{
 		color_image_views.push_back(vk->frames[vk->image_index].texture.image_view);
-		depth_image_view = vk->depth_texture.image_view;
+		depth_image_view = store->textures.at(vk->depth_texture_fffuuu.handle).image_view;
+		depth_layout = store->textures.at(vk->depth_texture_fffuuu.handle).layout;
 		width = vk->width;
 		height = vk->height;
 	}
@@ -648,7 +651,7 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 		.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
 		.pNext = nullptr,
 		.imageView = depth_image_view, //store->textures[framebuffer.depth_texture.handle].image_view,
-		.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		.imageLayout = depth_layout, //VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, //VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		.resolveMode = VK_RESOLVE_MODE_NONE,
 		.resolveImageView = VK_NULL_HANDLE,
 		.resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
@@ -680,6 +683,7 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 void RenderDeviceVK::SetViewport(glm::ivec4 viewport)
 {
 	VkViewport vk_viewport { float(viewport.x), float(viewport.y), float(viewport.z), float(viewport.w), 0.0f, 1.0f };
+	//VkViewport vk_viewport { float(viewport.x), float(viewport.w), float(viewport.z), float(-viewport.w), 0.0f, 1.0f };
 	VkRect2D vk_scissor { { viewport.x, viewport.y }, { uint32_t(viewport.z), uint32_t(viewport.w) } };
 	vkCmdSetViewport(vk->current_command_buffer, 0, 1, &vk_viewport);
 	vkCmdSetScissor(vk->current_command_buffer, 0, 1, &vk_scissor);
@@ -780,12 +784,12 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 	//if (is_depth != Texture::IsDepth(texture.format))
 	//	std::terminate();
 
-	vk::Texture vk_texture {};
+	vk::Texture *vk_texture = nullptr;
 	VkImageSubresourceRange subresource_range = vk->generic_subresource;
 
 	if (!texture)
 	{
-		vk_texture = vk->frames[vk->image_index].texture;
+		vk_texture = &vk->frames[vk->image_index].texture;
 	}
 	else
 	{
@@ -793,7 +797,7 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 		//if (texture.prev_layout == to) // FIXME: does queue transfer has same layout? need to check
 		//	return;
 
-		vk_texture = store->textures[texture.handle];
+		vk_texture = &store->textures[texture.handle];
 
 		if (Texture::IsDepth(texture.format))
 			subresource_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
@@ -830,6 +834,9 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 		case ImageLayout::SHADER_READ_ONLY:
 			break;
 
+		case ImageLayout::DEPTH_READ:
+			break; // TODO: implement
+
 		case ImageLayout::PRESENT:
 			Log() << "Can't convert from PRESENT layout";
 			return;
@@ -860,6 +867,11 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 			dst_access_mask = VK_ACCESS_2_SHADER_READ_BIT; // VK_ACCESS_2_NONE if color
 			break;
 
+		case ImageLayout::DEPTH_READ:
+			dst_stage_mask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
+			dst_access_mask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+			break; // TODO: implement
+
 		case ImageLayout::PRESENT:
 			dst_stage_mask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
 			dst_access_mask = VK_ACCESS_2_NONE;
@@ -878,7 +890,7 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 		.newLayout = new_layout,
 		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		.image = vk_texture.image,
+		.image = vk_texture->image,
 		.subresourceRange = subresource_range,
 	};
 
@@ -897,7 +909,7 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 
 	vkCmdPipelineBarrier2(vk->current_command_buffer, &dependency_info);
 
-	//texture.prev_layout = to;
+	vk_texture->layout = vk::ConvertEnum(to);
 }
 
 GPUBuffer RenderDeviceVK::CreateBuffer(GPUBuffer::Type type, uint32_t size)
@@ -1038,11 +1050,32 @@ void RenderDeviceVK::WriteDescriptor(DescriptorSet set, uint32_t binding, GPUBuf
 void RenderDeviceVK::WriteDescriptor(DescriptorSet set, uint32_t binding, Texture value, uint32_t index)
 {
 	vk::Texture texture = store->textures.at(value.handle);
+	VkImageView image_view = texture.image_view;
+	VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	if (Texture::IsDepth(value.format))
+	{
+		VkImageViewCreateInfo image_view_ci
+		{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.image = texture.image,
+			.viewType = VK_IMAGE_VIEW_TYPE_2D,
+			.format = vk::ConvertEnum(value.format),
+			.components = {},
+			.subresourceRange = vk->generic_subresource,
+		};
+
+		layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		vkCreateImageView(vk->device, &image_view_ci, nullptr, &image_view);
+	}
+
 	VkDescriptorImageInfo image_info
 	{
 		.sampler = vk->linear_sampler,
-		.imageView = texture.image_view,
-		.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		.imageView = image_view,
+		.imageLayout = layout,
 	};
 
 	VkWriteDescriptorSet write_set
@@ -1130,8 +1163,8 @@ Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc
 		.flags = 0,
 		.imageType = VK_IMAGE_TYPE_2D,
 		.format = vk::ConvertEnum(desc.format),
-		.extent = { static_cast<uint32_t>(desc.width), static_cast<uint32_t>(desc.height), 1 },
-		.mipLevels = static_cast<uint32_t>(desc.levels),
+		.extent = { desc.width, desc.height, 1 },
+		.mipLevels = desc.levels,
 		.arrayLayers = 1,
 		.samples = VK_SAMPLE_COUNT_1_BIT,
 		.tiling = VK_IMAGE_TILING_OPTIMAL,
@@ -1194,7 +1227,7 @@ Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc
 
 	if (desc.pixels == nullptr)
 	{
-		store->textures.push_back({ image, image_view, memory });
+		store->textures.push_back({ image, image_view, memory, VK_IMAGE_LAYOUT_UNDEFINED });
 		return { { uint32_t(store->textures.size() - 1) }, desc.format };
 	}
 
@@ -1250,7 +1283,7 @@ Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc
 
 	// ------------------------------------------------------------------------------------------
 
-	store->textures.push_back({ image, image_view, memory });
+	store->textures.push_back({ image, image_view, memory, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
 	return { { uint32_t(store->textures.size() - 1) }, desc.format };
 }
 

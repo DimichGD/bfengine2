@@ -118,6 +118,55 @@ int main()
 
 	ResourceManager resources(&device2, &fs);
 
+	Shader vs_flip = device2.LoadShader(Shader::Type::VERTEX, "vk_flip");
+	Shader fs_flip = device2.LoadShader(Shader::Type::FRAGMENT, "vk_flip");
+
+	TextureDesc final_texture_desc
+	{
+		.width = cfg.window.width,
+		.height = cfg.window.height,
+		.format = Texture::Format::RGBA8,
+		.usage = Texture::Usage::COLOR_ATTACHMENT | Texture::Usage::SHADER_READ,
+		.levels = 1,
+		.pixels = nullptr,
+		.generate_mipmaps = false,
+	};
+
+	Texture flip_texture = device2.CreateTexture("Flip Texture", final_texture_desc);
+
+	FramebufferDesc final_fbo_desc
+	{
+		.width = cfg.window.width,
+		.height = cfg.window.height,
+		.color_textures = { flip_texture },
+		.depth_texture = device2.GetDepthTexture(),
+	};
+
+	FramebufferID final_fbo = device2.CreateFramebuffer(final_fbo_desc);
+
+	PipelineDesc pipeline_flip_desc
+	{
+		.shaders = { vs_flip, fs_flip },
+		.topology = Topology::TRIANGLES,
+		.vertex_attribs = Vertex::Attrib::POSITION | Vertex::Attrib::TEXCOORD_0,
+		.raster = {
+			.blend = Blend::NONE,
+			.depth_test = false,
+			.depth_write = false,
+		},
+		.framebuffer_id = {},
+	};
+
+	glm::mat4 ortho = glm::ortho(0.0f, float(cfg.window.width), float(cfg.window.height), 0.0f);
+	GPUBuffer ortho_ubo = device2.CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4));
+	device2.UpdateBuffer(ortho_ubo, sizeof(glm::mat4), glm::value_ptr(ortho), 0);
+
+	PipelineID pipeline_flip = device2.CreatePipeline("Flip Pipeline", pipeline_flip_desc);
+	DescriptorSet flip_scene_set = device2.CreateDescriptorSet(pipeline_flip, Descriptor2::Set::SCENE);
+	DescriptorSet flip_material_set = device2.CreateDescriptorSet(pipeline_flip, Descriptor2::Set::MATERIAL);
+	device2.WriteDescriptor(flip_scene_set, 0, ortho_ubo);
+	device2.WriteDescriptor(flip_material_set, 0, flip_texture);
+
 	Shader vs4 = device2.LoadShader(Shader::Type::VERTEX, "ui/vk_texture");
 	Shader fs4 = device2.LoadShader(Shader::Type::FRAGMENT, "ui/vk_texture");
 
@@ -131,7 +180,7 @@ int main()
 			.depth_test = false,
 			.depth_write = false,
 		},
-		.framebuffer_id = {},
+		.framebuffer_id = final_fbo,
 	};
 	PipelineID pipeline_ui = device2.CreatePipeline("ui", desc4);
 
@@ -162,6 +211,7 @@ int main()
 	view_transform.pos = glm::vec3(5.0f, 4.0f, 10.0f);
 	view_transform.rot = glm::quat(glm::vec3(glm::radians(-30.0f), glm::radians(30.0f), 0.0f));
 	glm::mat4 proj = glm::perspectiveFovZO(glm::radians(80.0f), float(width), float(height), 0.1f, 100.0f);
+	//proj[1][1] *= -1;
 
 	GPUBuffer camera_ubo = device2.CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4) * 2);
 	device2.UpdateBuffer(camera_ubo, sizeof(glm::mat4), glm::value_ptr(proj), 0);
@@ -196,7 +246,7 @@ int main()
 	};
 
 	GPUBuffer point_lights_ubo = device2.CreateBuffer(GPUBuffer::UNIFORM, point_lights);
-	GPUBuffer camera_pos_ubo = device2.CreateBuffer(GPUBuffer::UNIFORM, sizeof(float) * 3);
+	GPUBuffer camera_pos_ubo = device2.CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::vec4) + sizeof(glm::mat4) * 2);
 
 	std::vector<Mesh> meshes;
 
@@ -214,17 +264,14 @@ int main()
 	device2.SetTrackedResource(device2.GetDepthTexture());
 
 	PointLightRenderPath point_light_rp(&device2, &cfg, &resources);
-	point_light_rp.Create(&graphics_context, deferred.GetColorTextures());
+	point_light_rp.Create(&graphics_context, deferred.GetColorTextures(), deferred.GetDepthTexture(), final_fbo);
 
 	Debug debug(&device2, &cfg, &resources);
-	debug.Create(&graphics_context);
+	debug.Create(&graphics_context, final_fbo);
 
 	meshes.push_back(resources.LoadMesh("cubes.bin"));
 
 	Font font;
-	glm::mat4 ortho = glm::ortho(0.0f, float(cfg.window.width), float(cfg.window.height), 0.0f);
-	GPUBuffer ortho_ubo = device2.CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4));
-	device2.UpdateBuffer(ortho_ubo, sizeof(glm::mat4), glm::value_ptr(ortho), 0);
 	Texture font_tex = resources.LoadTexture(font.TextureName());
 	font.SetTextureScale(1.0f / 512.0f);
 	DescriptorSet ui_scene_set = device2.CreateDescriptorSet(pipeline_ui, Descriptor2::Set::SCENE);
@@ -277,6 +324,8 @@ int main()
 	meshes3.push_back(resources.LoadMesh("sphere.bin"));
 	meshes3[0].matrix_index = 2;
 
+
+
 	bool capture_mouse = true;
 	wnd.CaptureMouse(capture_mouse);
 	Input input;
@@ -295,9 +344,10 @@ int main()
 			// if not capture, move cursor to center?
 		}
 
-		float move_speed = 5.0f;
+		float move_speed = 10.0f;
 		float turn_speed = 5.0f;
 		float dt = 1.0f / 60.0f;
+		float speed_modifier = 1.0f;
 
 		uint32_t KEY_MOVE_LEFT = SDL_SCANCODE_A;
 		uint32_t KEY_MOVE_RIGHT = SDL_SCANCODE_D;
@@ -305,10 +355,14 @@ int main()
 		uint32_t KEY_MOVE_BACKWARD = SDL_SCANCODE_S;
 		uint32_t KEY_MOVE_UP = SDL_SCANCODE_SPACE;
 		uint32_t KEY_MOVE_DOWN = SDL_SCANCODE_LCTRL;
+		uint32_t KEY_RUN = SDL_SCANCODE_LSHIFT;
 
-		float dx = (input.KeyPressed(KEY_MOVE_RIGHT) - input.KeyPressed(KEY_MOVE_LEFT)) * move_speed * dt;
+		if (input.KeyPressed(KEY_RUN))
+			speed_modifier = 2.0f;
+
+		float dx = (input.KeyPressed(KEY_MOVE_RIGHT) - input.KeyPressed(KEY_MOVE_LEFT)) * move_speed * speed_modifier * dt;
 		float dy = (input.KeyPressed(KEY_MOVE_UP) - input.KeyPressed(KEY_MOVE_DOWN)) * move_speed * dt;
-		float dz = (input.KeyPressed(KEY_MOVE_BACKWARD) - input.KeyPressed(KEY_MOVE_FORWARD)) * move_speed * dt;
+		float dz = (input.KeyPressed(KEY_MOVE_BACKWARD) - input.KeyPressed(KEY_MOVE_FORWARD)) * move_speed * speed_modifier * dt;
 		float yaw = input.MouseRelativePos().x * turn_speed * dt;
 		float pitch = input.MouseRelativePos().y * turn_speed * dt;
 
@@ -333,10 +387,16 @@ int main()
 
 		glm::mat4 view = glm::mat4_cast(glm::normalize(view_transform.rot));
 		view[3] = glm::vec4(view_transform.pos, 1.0f);
-		FastInverse(view);
+		//glm::mat4 view2 = view;
+		view = glm::inverse(view);
+		//FastInverse(view);
 		uint32_t stride = sizeof(glm::mat4);
 		device2.UpdateBuffer(camera_ubo, stride, glm::value_ptr(view), stride);
-		device2.UpdateBuffer(camera_pos_ubo, stride, glm::value_ptr(view_transform.pos), 0);
+		glm::vec4 temp_pos = glm::vec4(view_transform.pos, 1.0f);
+		//glm::mat4 inv_proj_view = glm::inverse(proj * view);
+		device2.UpdateBuffer(camera_pos_ubo, sizeof(glm::mat4), glm::value_ptr(glm::inverse(proj)), 0);
+		device2.UpdateBuffer(camera_pos_ubo, sizeof(glm::mat4), glm::value_ptr(glm::inverse(view)), sizeof(glm::mat4));
+		device2.UpdateBuffer(camera_pos_ubo, sizeof(glm::vec4), glm::value_ptr(temp_pos), sizeof(glm::mat4) * 2);
 
 		// mouse picking
 
@@ -362,6 +422,7 @@ int main()
 		if (glm::intersectRayPlane(orig, dir, plane_orig, plane_normal, dist))
 		{
 			sphere_pos = orig + dir * dist;
+			sphere_pos = glm::round(sphere_pos / 1.0f) * 1.0f;
 		}
 
 		glm::mat sphere_matrix = glm::translate(glm::mat4(1.0f), sphere_pos);
@@ -386,9 +447,12 @@ int main()
 		device2.LayoutTransition(deferred.GetColorTexture(2), ImageLayout::COLOR_ATTACHMENT, ImageLayout::SHADER_READ_ONLY);*/
 		for (auto texture: deferred.GetColorTextures())
 			device2.LayoutTransition(texture, ImageLayout::COLOR_ATTACHMENT, ImageLayout::SHADER_READ_ONLY);
+		device2.LayoutTransition(deferred.GetDepthTexture(), ImageLayout::DEPTH_STENCIL_ATTACHMENT, ImageLayout::DEPTH_READ);
+
+		device2.LayoutTransition(flip_texture, ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
 		device2.LayoutTransition({}, ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
 
-		device2.BeginRenderPass({}, RenderPass::Clear::COLOR);
+		device2.BeginRenderPass(final_fbo, RenderPass::Clear::COLOR);
 
 		point_light_rp.Render();
 
@@ -397,6 +461,8 @@ int main()
 		device2.BindDescriptorSet(Descriptor2::Set::MATERIAL, material_set_final);
 		device2.BindVertexBuffer(quad_vbo);
 		device2.Draw(0, 6);*/
+
+		//device2.LayoutTransition(deferred.GetDepthTexture(), ImageLayout::DEPTH_READ, ImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
 		meshes2.clear();
 		debug.Render(meshes2, meshes3); // grid, sphere
@@ -414,7 +480,18 @@ int main()
 		device2.BindVertexBuffer(text_vbo);
 		device2.Draw(0, text_verts_count);
 
+		device2.EndRenderPass(final_fbo);
+
+		device2.LayoutTransition(flip_texture, ImageLayout::COLOR_ATTACHMENT, ImageLayout::SHADER_READ_ONLY);
+
+		device2.BeginRenderPass({}, RenderPass::Clear::COLOR);
+		device2.BindPipeline(pipeline_flip);
+		device2.BindDescriptorSet(Descriptor2::Set::SCENE, flip_scene_set);
+		device2.BindDescriptorSet(Descriptor2::Set::MATERIAL, flip_material_set);
+		device2.BindVertexBuffer(quad_vbo);
+		device2.Draw(0, 6);
 		device2.EndRenderPass({});
+
 		device2.LayoutTransition({}, ImageLayout::COLOR_ATTACHMENT, ImageLayout::PRESENT);
 
 		if (!device2.EndFrame())

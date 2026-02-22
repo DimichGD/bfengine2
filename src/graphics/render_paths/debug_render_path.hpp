@@ -12,7 +12,7 @@ public:
 	BF_NON_MOVABLE(Debug)
 	BF_NON_COPYABLE(Debug)
 
-	void Create(GraphicsContext *context);
+	void Create(GraphicsContext *context, FramebufferID out_fbo);
 	void Destroy();
 	void Render(std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2);
 
