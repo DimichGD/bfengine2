@@ -6,34 +6,26 @@
 
 BF_BEGIN_NAMESPACE
 
-ResourceManager::ResourceManager(RenderDeviceGL *device)
+ResourceManager::ResourceManager(RenderDevice *device, FileSystem *fs)
 {
 	this->device = device;
+	this->fs = fs;
 
-	//if (IMG_Init(IMG_INIT_PNG) == 0)
-	//	Log() << "Failed to initialize SDL_image" << IMG_GetError();
+	std::string material_name = "wall/gotbwall4";
+	Texture tex_d = LoadTexture(material_name + "_d.png");
+	Texture tex_n = LoadTexture(material_name + "_local.png");
+	Texture tex_s = LoadTexture(material_name + "_s.png");
+	materials[material_name] = std::make_shared<PhongMaterial>(tex_d, tex_n, tex_s);
 
-	/*std::array<std::string_view, 4> paths
-	{
-		"data/",
-		"../data/",
-		"../../data/",
-		"../../../data/",
-	};
+	material_name = "floor/diafloor";
+	tex_d = LoadTexture(material_name + "_d.png");
+	tex_n = LoadTexture(material_name + "_local.png");
+	tex_s = LoadTexture(material_name + "_s.png");
+	materials[material_name] = std::make_shared<PhongMaterial>(tex_d, tex_n, tex_s);
 
-	for (auto &p: paths)
-	{
-		if (std::filesystem::exists(p) && std::filesystem::is_directory(p))
-		{
-			data_path = p;
-			break;
-		}
-	}
-
-	if (data_path.empty())
-		Log() << "Data path not found";*/
-
-	// set paths for all directories to eliminate allocations?
+	material_name = "red.png";
+	tex_d = LoadTexture(material_name);
+	materials[material_name] = std::make_shared<Material>(tex_d);
 }
 
 ResourceManager::ResourceManager(RenderDeviceVK *device, FileSystem *fs)
@@ -42,6 +34,22 @@ ResourceManager::ResourceManager(RenderDeviceVK *device, FileSystem *fs)
 	this->fs = fs;
 
 	// set paths for all directories to eliminate allocations?
+
+	std::string material_name = "wall/gotbwall4";
+	Texture tex_d = LoadTexture(material_name + "_d.png");
+	Texture tex_n = LoadTexture(material_name + "_local.png");
+	Texture tex_s = LoadTexture(material_name + "_s.png");
+	materials[material_name] = std::make_shared<PhongMaterial>(tex_d, tex_n, tex_s);
+
+	material_name = "floor/diafloor";
+	tex_d = LoadTexture(material_name + "_d.png");
+	tex_n = LoadTexture(material_name + "_local.png");
+	tex_s = LoadTexture(material_name + "_s.png");
+	materials[material_name] = std::make_shared<PhongMaterial>(tex_d, tex_n, tex_s);
+
+	material_name = "red.png";
+	tex_d = LoadTexture(material_name);
+	materials[material_name] = std::make_shared<Material>(tex_d);
 }
 
 ResourceManager::~ResourceManager()
@@ -104,7 +112,7 @@ Texture ResourceManager::LoadTexture(std::string_view filename)
 		.generate_mipmaps = false,
 	};
 
-	Texture result = device ? device->CreateTexture(desc) : device2->CreateTexture(std::string(filename), desc);
+	Texture result = device ? device->CreateTexture(std::string(filename), desc) : device2->CreateTexture(std::string(filename), desc);
 	//device2->SetDebugName(result, std::string(filename).c_str());
 	SDL_DestroySurface(surf);
 
@@ -151,18 +159,19 @@ Mesh ResourceManager::LoadMesh(std::string_view filename)
 
 		if (version == 2)
 		{
-			Texture tex_d = LoadTexture(material_name);
-			Material *mat = new Material(tex_d);
-			surfaces[i] = { { vertex_start, vertex_count }, mat, 0 };
+			/*Texture tex_d = LoadTexture(material_name);
+			Material *mat = new Material(tex_d);*/
+			surfaces[i] = { { vertex_start, vertex_count }, LoadMaterial(material_name), 0 };
 		}
 
 		if (version == 3)
 		{
-			Texture tex_d = LoadTexture(material_name + "_d.png");
+			/*Texture tex_d = LoadTexture(material_name + "_d.png");
 			Texture tex_n = LoadTexture(material_name + "_local.png");
 			Texture tex_s = LoadTexture(material_name + "_s.png");
-			PhongMaterial *mat = new PhongMaterial(tex_d, tex_n, tex_s);
-			surfaces[i] = { { vertex_start, vertex_count }, mat, 0 };
+			PhongMaterial *mat = new PhongMaterial(tex_d, tex_n, tex_s);*/
+			//Log() << material_name;
+			surfaces[i] = { { vertex_start, vertex_count }, LoadMaterial(material_name), 0 };
 		}
 	}
 
@@ -173,8 +182,17 @@ Mesh ResourceManager::LoadMesh(std::string_view filename)
 	std::vector<char> verts(vertex_count * vertex_stride);
 	mesh_file.Read(verts.data(), vertex_count * vertex_stride);
 
-	GPUBuffer cubes_vbo = device2->CreateBuffer(GPUBuffer::VERTEX, verts);
+	GPUBuffer cubes_vbo = device ? device->CreateBuffer(GPUBuffer::VERTEX, verts) : device2->CreateBuffer(GPUBuffer::VERTEX, verts);
 	return { .surfaces = surfaces, .vbo = cubes_vbo, .matrix_index = 0 };
+}
+
+std::shared_ptr<IMaterial> ResourceManager::LoadMaterial(const std::string &name)
+{
+	auto it = materials.find(name);
+	if (it == materials.end())
+		return nullptr; // Load material
+
+	return it->second;
 }
 
 BF_END_NAMESPACE

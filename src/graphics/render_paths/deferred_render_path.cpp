@@ -3,7 +3,7 @@
 
 BF_BEGIN_NAMESPACE
 
-Deferred::Deferred(RenderDeviceVK *device, Config *config, ResourceManager *resources)
+Deferred::Deferred(RenderDeviceGL *device, Config *config, ResourceManager *resources)
 {
 	this->device = device;
 	this->config = config;
@@ -12,43 +12,13 @@ Deferred::Deferred(RenderDeviceVK *device, Config *config, ResourceManager *reso
 	this->height = config->window.height;
 }
 
-void Deferred::Create(GraphicsContext *context)
+void Deferred::Create(GraphicsContext *context, FramebufferID out_fbo)
 {
 	this->context = context;
+	const char *deferred_texture_shader_name = config->render.api == Config::Render::API::VK ? "deferred/vk_texture" : "deferred/gl_texture";
 
-	TextureDesc color_desc
-	{
-		.width = width,
-		.height = height,
-		.format = Texture::Format::RGBA16F,
-		.usage = Texture::Usage::COLOR_ATTACHMENT | Texture::Usage::SHADER_READ,
-		.levels = 1,
-		.pixels = nullptr,
-		.generate_mipmaps = false,
-	};
-
-	std::vector<Texture> color_textures
-	{
-		device->CreateTexture("Render Target 0", color_desc),
-		device->CreateTexture("Render Target 1", color_desc),
-		device->CreateTexture("Render Target 2", color_desc),
-		device->CreateTexture("Render Target 3", color_desc),
-	};
-
-	FramebufferDesc framebuffer_desc
-	{
-		.width = width,
-		.height = height,
-		/*.color_texture_count = 1,
-		.color_format = Texture::Format::RGBA8_SRGB,
-		.depth_format = Texture::Format::D24S8,*/
-		.color_textures = color_textures,
-		.depth_texture = device->GetDepthTexture(), //device->CreateTexture(depth_desc, false),
-	};
-
-	gbuffer = device->CreateFramebuffer(framebuffer_desc);
-	Shader vs = device->LoadShader(Shader::Type::VERTEX, "deferred/vk_texture");
-	Shader fs = device->LoadShader(Shader::Type::FRAGMENT, "deferred/vk_texture");
+	Shader vs = device->LoadShader(Shader::Type::VERTEX, deferred_texture_shader_name);
+	Shader fs = device->LoadShader(Shader::Type::FRAGMENT, deferred_texture_shader_name);
 
 	PipelineDesc pipeline_desc
 	{
@@ -56,7 +26,7 @@ void Deferred::Create(GraphicsContext *context)
 		.topology = Topology::TRIANGLES,
 		.vertex_attribs = Vertex::Attrib::POSITION | Vertex::Attrib::TEXCOORD_0| Vertex::Attrib::NORMAL | Vertex::Attrib::TANGENT,
 		.raster = {},
-		.framebuffer_id = gbuffer,
+		.framebuffer_id = out_fbo,
 	};
 
 	pipeline = device->CreatePipeline("deferred/static_meshes", pipeline_desc);
@@ -73,7 +43,7 @@ void Deferred::Destroy()
 
 void Deferred::Render(std::vector<Mesh> &meshes)
 {
-	device->BeginRenderPass(gbuffer, RenderPass::Clear::COLOR_DEPTH);
+	//device->BeginRenderPass(gbuffer, RenderPass::Clear::COLOR_DEPTH);
 
 	device->BindPipeline(pipeline);
 	device->BindDescriptorSet(Descriptor2::Set::SCENE, scene_set);
@@ -87,16 +57,21 @@ void Deferred::Render(std::vector<Mesh> &meshes)
 			device->Push(Shader::Type::VERTEX, 0, mesh.matrix_index);
 			//device->Push(Shader::Type::FRAGMENT, 4, surf.texture_index);
 			//materials.at(surf.texture_index).Bind(device);
-			if (!surf.material->Ready())
-				surf.material->Setup(device, device->CreateDescriptorSet(pipeline, Descriptor2::Set::MATERIAL));
+			//if (!surf.material->Ready())
+			//	surf.material->Setup(device, device->CreateDescriptorSet(pipeline, Descriptor2::Set::MATERIAL));
+			if (!surf.descriptor_set)
+			{
+				surf.descriptor_set = device->CreateDescriptorSet(pipeline, Descriptor2::Set::MATERIAL);
+				surf.material->Setup(device, surf.descriptor_set);
+			}
 
-			surf.material->Bind(device);
-			//device->BindDescriptorSet(Descriptor2::Set::MATERIAL, surf.material.descriptor_set);
+			//surf.material->Bind(device);
+			device->BindDescriptorSet(Descriptor2::Set::MATERIAL, surf.descriptor_set);
 			device->Draw(surf.vertex_range.start, surf.vertex_range.count);
 		}
 	}
 
-	device->EndRenderPass(gbuffer);
+	//device->EndRenderPass(gbuffer);
 }
 
 

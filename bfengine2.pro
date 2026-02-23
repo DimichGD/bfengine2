@@ -12,6 +12,7 @@ SOURCES += \
     src/core/log.cpp \
     src/engine/resource_manager.cpp \
     src/entities/transform.cpp \
+    src/graphics/geometry.cpp \
     src/graphics/opengl/convert_enum_gl.cpp \
     src/graphics/opengl/opengl_gen.cpp \
     src/graphics/opengl/render_device_gl.cpp \
@@ -41,6 +42,7 @@ HEADERS += \
     src/core/log.hpp \
     src/engine/resource_manager.hpp \
     src/entities/transform.hpp \
+    src/graphics/geometry.hpp \
     src/graphics/opengl/convert_enum_gl.hpp \
     src/graphics/opengl/opengl_gen.hpp \
     src/graphics/opengl/render_device_gl.hpp \

@@ -5,8 +5,8 @@ BF_BEGIN_NAMESPACE
 
 bool IsRenderDocAttached()
 {
-	HMODULE module = GetModuleHandle(L"renderdoc.dll");
-	return module != nullptr;
+	HMODULE module_handle = GetModuleHandle(L"renderdoc.dll");
+	return module_handle != nullptr;
 }
 
 BF_END_NAMESPACE

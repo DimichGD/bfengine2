@@ -8,7 +8,7 @@ BF_BEGIN_NAMESPACE
 class PointLightRenderPath
 {
 public:
-	PointLightRenderPath(RenderDeviceVK *device, Config *config, ResourceManager *resources);
+	PointLightRenderPath(RenderDeviceGL *device, Config *config, ResourceManager *resources);
 	BF_NON_MOVABLE(PointLightRenderPath)
 	BF_NON_COPYABLE(PointLightRenderPath)
 
@@ -17,7 +17,8 @@ public:
 	void Render();
 
 private:
-	RenderDeviceVK *device = nullptr;
+	//RenderDeviceVK *device = nullptr;
+	RenderDeviceGL *device = nullptr;
 	Config *config = nullptr;
 	ResourceManager *resources = nullptr;
 	GraphicsContext *context = nullptr;
@@ -30,6 +31,8 @@ private:
 	DescriptorSet scene_set {};
 	DescriptorSet material_set {};
 	GPUBuffer quad_vbo {};
+	GPUBuffer sphere_vbo {};
+	uint32_t sphere_vertex_count = 0;
 };
 
 BF_END_NAMESPACE

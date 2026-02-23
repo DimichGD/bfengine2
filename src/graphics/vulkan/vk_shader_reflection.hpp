@@ -6,9 +6,10 @@
 BF_BEGIN_NAMESPACE
 BF_BEGIN_VK_NAMESPACE
 
-ShaderReflectionData GetShaderReflection(Shader::Type type, const uint32_t *spirv, size_t word_count);
+ShaderReflectionData GetShaderReflection(const std::string &name, Shader::Type type, const uint32_t *spirv, size_t word_count);
 std::vector<uint32_t> CompileShader(const std::string &name, const std::vector<char> &source);
 VkPipelineLayout CreatePipelineLayout(VkDevice device,
+									  std::map<uint32_t, VkDescriptorSetLayout> &global_descriptor_set_layouts,
 									  const std::vector<ShaderReflectionData *> &reflection_data,
 									  std::vector<VkDescriptorSetLayout> &decriptor_set_layouts,
 									  VkPipelineLayoutCreateFlags flags);

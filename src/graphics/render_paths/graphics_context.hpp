@@ -1,6 +1,5 @@
 #pragma once
-#include "engine/resource_manager.hpp"
-#include "graphics/vulkan/render_device_vk.hpp"
+#include "graphics/types.hpp"
 
 BF_BEGIN_NAMESPACE
 

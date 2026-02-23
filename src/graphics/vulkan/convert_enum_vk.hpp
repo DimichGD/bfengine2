@@ -5,7 +5,7 @@
 BF_BEGIN_NAMESPACE
 BF_BEGIN_VK_NAMESPACE
 
-VkShaderStageFlagBits ConvertEnum(Shader::Type type);
+VkShaderStageFlags ConvertEnum(Shader::Type type);
 VkBufferUsageFlags ConvertEnum(GPUBuffer::Type type);
 VkFormat ConvertEnum(Vertex::Attrib attrib);
 VkPrimitiveTopology ConvertEnum(Topology topology);

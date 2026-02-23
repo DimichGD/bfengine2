@@ -14,8 +14,9 @@ public:
 	void SetTopology(Topology topology);
 	void SetLayout(VkPipelineLayout layout);
 	void SetRasterState(Raster raster_state);
-	void SetSwapchainFormat(VkFormat format);
-	void SetAttachmentFormats(std::vector<bf::Texture::Format> formats);
+	void SetSwapchainFormat(VkFormat color_format, VkFormat depth_format);
+	//void SetAttachmentFormats(std::vector<bf::Texture::Format> formats);
+	void SetFramebuffer(const Framebuffer &framebuffer);
 	void AppendShader(VkShaderStageFlagBits stage, VkShaderModule module);
 
 	VkPipeline CreateVertexInputStage(Vertex::Attrib vertex_attribs, Topology topology);
@@ -27,11 +28,7 @@ public:
 
 	VkPipeline Build(VkDevice device, VkPipelineCache pipeline_cache);
 
-	struct VertexInput
-	{
-		std::vector<VkVertexInputBindingDescription> bindings;
-		std::vector<VkVertexInputAttributeDescription> attribs;
-	};
+
 
 private:
 	//static std::map<uint64_t, VkPipeline> vertex_input_stages;
@@ -40,14 +37,21 @@ private:
 	//static std::vector<VkPipeline> fragment_output_stages;
 
 	//uint32_t vertex_input_stage_index = 0;
-	uint32_t vertex_shader_stage_index = 0;
+	/*uint32_t vertex_shader_stage_index = 0;
 	uint32_t fragment_shader_stage_index = 0;
-	uint32_t fragment_output_stage_index = 0;
+	uint32_t fragment_output_stage_index = 0;*/
+
+	struct VertexInput
+	{
+		std::vector<VkVertexInputBindingDescription> bindings;
+		std::vector<VkVertexInputAttributeDescription> attribs;
+	};
 
 	std::vector<VkPipelineShaderStageCreateInfo> shader_stage_ci_array;
 	VertexInput vertex_input;
 	VkPrimitiveTopology topology;
 	std::vector<VkFormat> attachment_formats;
+	VkFormat depth_format = VK_FORMAT_UNDEFINED;
 	//VkFormat swapchain_format = VK_FORMAT_UNDEFINED;
 
 	VkBool32 depth_test_enable = VK_FALSE;

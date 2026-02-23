@@ -9,8 +9,8 @@
 
 extern "C"
 {
-	__declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
-	__declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x00000001;
+	__declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001; // TODO: make sure DWORD == unsigned long
+	__declspec(dllexport) unsigned long AmdPowerXpressRequestHighPerformance = 0x00000001;
 }
 
 BF_BEGIN_NAMESPACE
@@ -39,9 +39,10 @@ void MessageCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLs
 	OpenGLMessage(message);
 }
 
-RenderDeviceGL::RenderDeviceGL(Config *config)
+RenderDeviceGL::RenderDeviceGL(Config *config, FileSystem *fs)
 {
 	this->config = config;
+	this->fs = fs;
 }
 
 RenderDeviceGL::~RenderDeviceGL()
@@ -49,7 +50,7 @@ RenderDeviceGL::~RenderDeviceGL()
 	//
 }
 
-void RenderDeviceGL::Create()
+void RenderDeviceGL::Create(SDL_Window *window_handle)
 {
 	gl_load_functions();
 
@@ -73,23 +74,37 @@ void RenderDeviceGL::Create()
 	glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // GL_LINEAR_MIPMAP_LINEAR
 	glBindSampler(0, sampler);
+
+	//glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
 }
 
-void RenderDeviceGL::BeginRenderPass(glm::ivec4 viewport, RenderPass::Clear clear_flags)
-{
-	//glClearColor(clear_flags.color.r, clear_flags.color.g, clear_flags.color.b, clear_flags.color.a);
-	//glClearDepth(clear_flags.depth);
-
-	glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-	glClear(gl::ConvertEnum(clear_flags));
-}
-
-void RenderDeviceGL::EndRenderPass()
+void RenderDeviceGL::Destroy()
 {
 	//
 }
 
-Pipeline RenderDeviceGL::CreatePipeline(const PipelineDesc &desc)
+void RenderDeviceGL::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::Clear clear_flags)
+{
+	//glClearColor(clear_flags.color.r, clear_flags.color.g, clear_flags.color.b, clear_flags.color.a);
+	//glClearDepth(clear_flags.depth);
+
+	if (framebuffer_id)
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_id.handle);
+
+	else
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	//glViewport(framebuffer_id[0], framebuffer_id[1], framebuffer_id[2], framebuffer_id[3]);
+	glViewport(0, 0, config->window.width, config->window.height);
+	glClear(gl::ConvertEnum(clear_flags));
+}
+
+void RenderDeviceGL::EndRenderPass(FramebufferID framebuffer_id)
+{
+	//
+}
+
+PipelineID RenderDeviceGL::CreatePipeline(const std::string &name, const PipelineDesc &desc)
 {
 	Pipeline pipeline
 	{
@@ -99,19 +114,20 @@ Pipeline RenderDeviceGL::CreatePipeline(const PipelineDesc &desc)
 		.raster = desc.raster,
 	};
 
-	return pipeline;
+	pipelines.push_back(pipeline);
+	return { uint32_t(pipelines.size() - 1) };
 }
 
-void RenderDeviceGL::BindPipeline(Pipeline pipeline)
+void RenderDeviceGL::BindPipeline(PipelineID pipeline_id)
 {
-	current_pipeline = pipeline;
-	glUseProgram(pipeline.prog.handle);
-	glBindVertexArray(pipeline.vao.handle);
+	current_pipeline = pipelines[pipeline_id.handle];
+	glUseProgram(current_pipeline.prog.handle);
+	glBindVertexArray(current_pipeline.vao.handle);
 	//glVertexArrayElementBuffer(pipeline.vao.handle, 0);
 
-	pipeline.raster.depth_test ? glEnable(GL_DEPTH_TEST) : glDisable(GL_DEPTH_TEST);
+	current_pipeline.raster.depth_test ? glEnable(GL_DEPTH_TEST) : glDisable(GL_DEPTH_TEST);
 
-	switch (pipeline.raster.blend)
+	switch (current_pipeline.raster.blend)
 	{
 		case Blend::NONE:
 			glDisable(GL_BLEND);
@@ -133,7 +149,7 @@ void RenderDeviceGL::BindPipeline(Pipeline pipeline)
 			break;
 	}
 
-	glEnable(GL_CULL_FACE);
+	//glEnable(GL_CULL_FACE);
 	//glEnable(GL_MULTISAMPLE);
 }
 
@@ -148,6 +164,90 @@ void RenderDeviceGL::BindIndexBuffer(GPUBuffer buffer)
 	assert(buffer.type == GPUBuffer::Type::INDEX);
 	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer.handle);
 	glVertexArrayElementBuffer(current_pipeline.vao.handle, buffer.handle);
+}
+
+void RenderDeviceGL::SetCullMode(uint32_t mode)
+{
+	if (mode == 0)
+	{
+		glDisable(GL_CULL_FACE);
+	}
+
+	GLenum cull_mode = GL_BACK;
+	switch (mode)
+	{
+		case 1:  cull_mode = GL_FRONT; break;
+		case 2:  cull_mode = GL_BACK; break;
+		case 3:  cull_mode = GL_FRONT_AND_BACK; break;
+	}
+
+	glEnable(GL_CULL_FACE);
+	glCullFace(cull_mode);
+}
+
+DescriptorSet RenderDeviceGL::CreateDescriptorSet(PipelineID pipeline, Descriptor2::Set set)
+{
+	descriptors2.push_back({});
+	return { uint32_t(descriptors2.size() - 1) };
+}
+
+void RenderDeviceGL::WriteDescriptor(DescriptorSet set, uint32_t binding, GPUBuffer value)
+{
+	descriptors2.at(set.handle)[binding] = { -1, value };
+}
+
+void RenderDeviceGL::WriteDescriptor(DescriptorSet set, uint32_t binding, Texture value, uint32_t index)
+{
+	descriptors2.at(set.handle)[binding] = { -1, value };
+}
+
+void RenderDeviceGL::BindDescriptorSet(Descriptor2::Set index, DescriptorSet descriptor_set)
+{
+	auto &set = descriptors2.at(descriptor_set.handle);
+	for (auto &desc_struct: set)
+	{
+		uint32_t binding = desc_struct.first;
+		Descriptor3 &desc = desc_struct.second;
+		switch (desc.value.index())
+		{
+			case 0:
+				{
+					Texture texture = std::get<Texture>(desc.value);
+					glBindTextureUnit(binding, texture.handle);
+				}
+				break;
+
+			case 1:
+				{
+					GPUBuffer buffer = std::get<GPUBuffer>(desc.value);
+					glBindBufferBase(gl::ConvertEnum(buffer.type), binding, buffer.handle);
+				}
+				break;
+		}
+	}
+}
+
+void RenderDeviceGL::Push(Shader::Type type, uint32_t offset, int value)
+{
+	if (offset == 0)
+		glUniform1i(-1, value);
+
+	else if (offset == 4)
+		glUniform1i(-1, value);
+}
+
+FramebufferID RenderDeviceGL::CreateFramebuffer(const FramebufferDesc &desc)
+{
+	uint32_t fbo;
+	glGenFramebuffers(1, &fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	for (size_t i = 0; i < desc.color_textures.size(); i++)
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, desc.color_textures[i].handle, 0);
+
+	if (desc.depth_texture)
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, desc.depth_texture.handle, 0);
+
+	return { fbo };
 }
 
 Shader RenderDeviceGL::CreateShader(Shader::Type type, const std::vector<char> &source)
@@ -173,6 +273,49 @@ Shader RenderDeviceGL::CreateShader(Shader::Type type, const std::vector<char> &
 
 		Log() << "Shader compilation failed";
 		Log() << log;
+		return {};
+	}
+
+	return Shader(shader, type);
+}
+
+Shader RenderDeviceGL::LoadShader(Shader::Type type, const std::string &name)
+{
+	std::string suffix;
+	switch (type)
+	{
+		case Shader::Type::VERTEX:   suffix = "_vert"; break;
+		case Shader::Type::FRAGMENT: suffix = "_frag"; break;
+		case Shader::Type::GEOMETRY: suffix = "_geom"; break;
+		case Shader::Type::COMPUTE:  suffix = "_comp"; break;
+	}
+
+	File source_file(fs->GetDataPath() + "shaders/" + name + suffix + ".glsl");
+
+	if (!source_file.Open())
+		return {};
+
+	std::vector<char> source = source_file.Read();
+
+	GLint length[] = { GLint(source.size()) };
+	GLchar const *strings[] = { source.data() };
+
+	GLuint shader = glCreateShader(gl::ConvertEnum(type));
+	glShaderSource(shader, 1, strings, length);
+	glCompileShader(shader);
+
+	GLint status = 0;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+	if (status != GL_TRUE)
+	{
+		GLint len;
+		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
+
+		std::string log(len, '\0');
+		glGetShaderInfoLog(shader, len, nullptr, log.data());
+
+		Error() << name << "Shader compilation failed";
+		Error() << log;
 		return {};
 	}
 
@@ -252,7 +395,7 @@ GPUBuffer RenderDeviceGL::CreateBuffer(GPUBuffer::Type type, uint32_t size, cons
 	GLuint buffer;
 	glCreateBuffers(1, &buffer);
 
-	GLbitfield flags = 0;
+	GLbitfield flags = GL_DYNAMIC_STORAGE_BIT;
 	if (data == nullptr)
 		flags = GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT;
 
@@ -277,12 +420,12 @@ void *RenderDeviceGL::MapBuffer(GPUBuffer buffer)
 	return glMapNamedBuffer(buffer.handle, GL_WRITE_ONLY);
 }
 
-void RenderDeviceGL::UnmapBuffer(GPUBuffer buffer)
+void RenderDeviceGL::UnMapBuffer(GPUBuffer buffer)
 {
 	glUnmapNamedBuffer(buffer.handle);
 }
 
-Texture RenderDeviceGL::CreateTexture(const TextureDesc &desc, bool generate_mipmaps)
+Texture RenderDeviceGL::CreateTexture(const std::string &name, const TextureDesc &desc)
 {
 	if (!desc.width || !desc.height || std::to_underlying(desc.format) == 0 || !desc.levels)
 	{
@@ -293,7 +436,7 @@ Texture RenderDeviceGL::CreateTexture(const TextureDesc &desc, bool generate_mip
 	gl::TextureFormat format = gl::ConvertEnum(desc.format);
 
 	int levels = desc.levels;
-	if (generate_mipmaps)
+	if (desc.generate_mipmaps)
 		levels = glm::floor(glm::log2(glm::max(desc.width, desc.height))) + 1;
 
 	GLuint tex;
@@ -304,10 +447,10 @@ Texture RenderDeviceGL::CreateTexture(const TextureDesc &desc, bool generate_mip
 	if (desc.pixels != nullptr)
 		glTextureSubImage2D(tex, 0, 0, 0, desc.width, desc.height, format.format, format.type, desc.pixels);
 
-	if (generate_mipmaps)
+	if (desc.generate_mipmaps)
 		glGenerateTextureMipmap(tex);
 
-	return Texture { tex };
+	return Texture { { tex }, desc.format };
 }
 
 void RenderDeviceGL::Draw(const std::vector<DrawCommand> &commands)

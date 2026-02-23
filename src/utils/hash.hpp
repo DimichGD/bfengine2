@@ -26,6 +26,15 @@ constexpr uint64_t FNV1A(std::string_view string)
 	return FNV1A(string.data(), string.size());
 }
 
+static uint32_t hash(size_t seed, uint32_t x)
+{
+	x = ((x >> 16) ^ x) * 0x45d9f3bu;
+	x = ((x >> 16) ^ x) * 0x45d9f3bu;
+	x = (x >> 16) ^ x;
+	seed ^= x + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	return seed;
+}
+
 /*uint64_t FNV1A(char *data, size_t len)
 {
 	uint64_t hash = 0xcbf29ce484222325;

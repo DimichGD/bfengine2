@@ -211,9 +211,17 @@ void RenderDeviceVK::Internal::CreateDevice()
 	device_pipeline_library.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT;
 	device_pipeline_library.graphicsPipelineLibrary = VK_TRUE;
 
+	VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features {};
+	descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+	descriptor_indexing_features.pNext = &device_pipeline_library;
+	/*descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+	descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
+	descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_TRUE;*/
+	descriptor_indexing_features.descriptorBindingPartiallyBound = VK_TRUE;
+
 	VkPhysicalDeviceVulkan14Features device_features_1_4 {};
 	device_features_1_4.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
-	device_features_1_4.pNext = &device_pipeline_library;
+	device_features_1_4.pNext = &descriptor_indexing_features;
 	device_features_1_4.hostImageCopy = VK_TRUE;
 
 	VkPhysicalDeviceVulkan13Features device_features_1_3 {};
@@ -222,18 +230,16 @@ void RenderDeviceVK::Internal::CreateDevice()
 	device_features_1_3.dynamicRendering = VK_TRUE;
 	device_features_1_3.synchronization2 = VK_TRUE;
 
-	VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features {};
-	descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-	descriptor_indexing_features.pNext = &device_features_1_3;
-	/*descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
-	descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
-	descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_TRUE;*/
-	descriptor_indexing_features.descriptorBindingPartiallyBound = VK_TRUE;
+	VkPhysicalDeviceFeatures2 phys_device_features {};
+	phys_device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+	phys_device_features.pNext = &device_features_1_3;
+	//phys_device_features.features.shaderUniformBufferArrayDynamicIndexing = VK_TRUE;
+	//phys_device_features.features.multiDrawIndirect = VK_TRUE;
 
-	VkDeviceCreateInfo device_ci =
+	VkDeviceCreateInfo device_ci
 	{
 		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-		.pNext = &descriptor_indexing_features,
+		.pNext = &phys_device_features,
 		.flags = 0,
 		.queueCreateInfoCount = uint32_t(device_queue_ci.size()),
 		.pQueueCreateInfos = device_queue_ci.data(),

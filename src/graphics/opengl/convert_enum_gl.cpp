@@ -66,7 +66,8 @@ TextureFormat ConvertEnum(bf::Texture::Format value)
 		case Texture::Format::RG8: return { GL_RG8, GL_RG, GL_UNSIGNED_BYTE };
 		case Texture::Format::RGB8: return { GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE };
 		case Texture::Format::RGBA8: return { GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE };
-		case Texture::Format::SRGBA8: return { GL_SRGB8_ALPHA8, GL_SRGB_ALPHA, GL_UNSIGNED_BYTE };
+		case Texture::Format::SRGBA8: return { GL_SRGB8_ALPHA8, GL_RGBA, GL_UNSIGNED_BYTE };
+		case Texture::Format::SBGRA8: Warn() << "OpenGL SBGRA8 not implemented"; return {};
 		case Texture::Format::RGBA16F: return { GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT };
 		case Texture::Format::D24: return { GL_DEPTH_COMPONENT24, GL_DEPTH, GL_FLOAT }; // FIXME: float?
 		case Texture::Format::D24S8: return { GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8 };

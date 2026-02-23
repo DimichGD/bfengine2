@@ -10,6 +10,14 @@ BF_BEGIN_NAMESPACE
 class Log
 {
 public:
+	enum class Level
+	{
+		INFO,
+		WARN,
+		ERROR, // ERROR conflicts with windows.h
+		LOG,
+	};
+
 	enum class Destination
 	{
 		STDOUT = 1,
@@ -17,14 +25,17 @@ public:
 		BOTH   = STDOUT | FILE,
 	};
 
-	Log(const std::string_view &category = {}, bool error = false);
+	Log(const std::string_view &category = {}, Level level = Level::LOG);
 	~Log();
 
-	static void Init(Destination destination = Destination::STDOUT);
+	static void Init(Destination destination = Destination::STDOUT, Level level = Level::INFO);
 
 	template<typename T>
 	Log &operator<<(const T &t)
 	{
+		if (uint32_t(current_level) < uint32_t(accept_level))
+			return *this;
+
 		if (ss.rdbuf()->in_avail())
 			ss << ' ';
 
@@ -35,6 +46,9 @@ public:
 	template<typename T>
 	Log &operator<<(const std::vector<T> &t)
 	{
+		if (uint32_t(current_level) < uint32_t(accept_level))
+			return *this;
+
 		*this << "[";
 
 		for (auto &v: t)
@@ -45,9 +59,12 @@ public:
 		return *this;
 	}
 
-	/*template<typename T>
+	template<typename T>
 	Log &operator<<(const std::span<T> &t)
 	{
+		if (uint32_t(current_level) < uint32_t(accept_level))
+			return *this;
+
 		*this << "[";
 
 		for (auto &v: t)
@@ -56,23 +73,9 @@ public:
 		*this << "]";
 
 		return *this;
-	}*/
+	}
 
-private:
-	static Destination dest;
-	std::stringstream ss {};
-	bool error = false;
-	//std::string buffer {};
-	//size_t cursor = 0;
-};
-
-class Error: public Log
-{
-public:
-	constexpr Error(std::source_location loc = std::source_location::current()):
-		Log(Trim(loc.function_name()), true) {}
-
-private:
+protected:
 	static constexpr std::string_view Trim(const char *function_name)
 	{
 		std::string_view name(function_name);
@@ -80,6 +83,33 @@ private:
 		size_t end = name.find('(');
 		return name.substr(start, end - start);
 	}
+
+private:
+	static Destination dest;
+	static Level accept_level;
+	std::stringstream ss {};
+	Level current_level = Level::INFO;
+};
+
+class Info: public Log
+{
+public:
+	constexpr Info(std::source_location loc = std::source_location::current()):
+		Log(Log::Trim(loc.function_name()), Level::INFO) {}
+};
+
+class Warn: public Log
+{
+public:
+	constexpr Warn(std::source_location loc = std::source_location::current()):
+		Log(Log::Trim(loc.function_name()), Level::WARN) {}
+};
+
+class Error: public Log
+{
+public:
+	constexpr Error(std::source_location loc = std::source_location::current()):
+		Log(Log::Trim(loc.function_name()), Level::ERROR) {}
 };
 
 BF_END_NAMESPACE

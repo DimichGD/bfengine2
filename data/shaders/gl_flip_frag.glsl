@@ -1,7 +1,7 @@
 #version 460 core
 #pragma shader_stage(fragment)
 
-layout(set = 1, binding = 0) uniform sampler2D diffuse_map;
+layout(binding = 0) uniform sampler2D diffuse_map;
 
 layout(location = 0) in vec2 TEXCOORD_0;
 layout(location = 0) out vec4 OUT_COLOR;

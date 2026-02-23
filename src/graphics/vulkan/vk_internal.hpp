@@ -87,7 +87,7 @@ struct RenderDeviceVK::Internal
 	VkDeviceMemory depth_memory = VK_NULL_HANDLE;
 	VkImageView depth_image_view = VK_NULL_HANDLE;*/
 	//vk::Texture depth_texture {};
-	bf::Texture depth_texture_fffuuu {};
+	//bf::Texture depth_texture_fffuuu {};
 	VkClearColorValue clear_color;
 	VkClearDepthStencilValue clear_depth_stencil;
 	VkSemaphore swapchain_semaphore = VK_NULL_HANDLE;

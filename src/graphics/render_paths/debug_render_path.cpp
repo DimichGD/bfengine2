@@ -2,7 +2,7 @@
 
 BF_BEGIN_NAMESPACE
 
-Debug::Debug(RenderDeviceVK *device, Config *config, ResourceManager *resources)
+Debug::Debug(RenderDevice *device, Config *config, ResourceManager *resources)
 {
 	this->device = device;
 	this->config = config;
@@ -14,11 +14,13 @@ Debug::Debug(RenderDeviceVK *device, Config *config, ResourceManager *resources)
 void Debug::Create(GraphicsContext *context, FramebufferID out_fbo)
 {
 	this->context = context;
+	const char *forward_line_shader_name = config->render.api == Config::Render::API::VK ? "forward/vk_line" : "forward/gl_line";
+	const char *forward_texture_shader_name = config->render.api == Config::Render::API::VK ? "forward/vk_texture" : "forward/gl_texture";
 
-	Shader vs_line = device->LoadShader(Shader::Type::VERTEX, "forward/vk_line");
-	Shader fs_line = device->LoadShader(Shader::Type::FRAGMENT, "forward/vk_line");
-	Shader vs_texture = device->LoadShader(Shader::Type::VERTEX, "forward/vk_texture");
-	Shader fs_texture = device->LoadShader(Shader::Type::FRAGMENT, "forward/vk_texture");
+	Shader vs_line = device->LoadShader(Shader::Type::VERTEX, forward_line_shader_name);
+	Shader fs_line = device->LoadShader(Shader::Type::FRAGMENT, forward_line_shader_name);
+	Shader vs_texture = device->LoadShader(Shader::Type::VERTEX, forward_texture_shader_name);
+	Shader fs_texture = device->LoadShader(Shader::Type::FRAGMENT, forward_texture_shader_name);
 
 	PipelineDesc pipeline_line_desc
 	{
@@ -27,7 +29,7 @@ void Debug::Create(GraphicsContext *context, FramebufferID out_fbo)
 		.vertex_attribs = Vertex::Attrib::POSITION,
 		.raster = {
 			.blend = Blend::NONE,
-			.depth_test = true,
+			.depth_test = false,
 			.depth_write = false,
 		},
 		.framebuffer_id = out_fbo,
@@ -100,12 +102,13 @@ void Debug::Render(std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2)
 		for (auto &surf: mesh.surfaces)
 		{
 			//device->Push(Shader::Type::FRAGMENT, 4, 0);
-			//materials.at(surf.texture_index).Bind(device);
-			if (!surf.material->Ready())
-				surf.material->Setup(device, device->CreateDescriptorSet(pipeline_meshes, Descriptor2::Set::MATERIAL));
+			if (!surf.descriptor_set)
+			{
+				surf.descriptor_set = device->CreateDescriptorSet(pipeline_meshes, Descriptor2::Set::MATERIAL);
+				surf.material->Setup(device, surf.descriptor_set);
+			}
 
-			surf.material->Bind(device);
-			//device->BindDescriptorSet(Descriptor2::Set::MATERIAL, surf.material.descriptor_set);
+			device->BindDescriptorSet(Descriptor2::Set::MATERIAL, surf.descriptor_set);
 			device->Draw(surf.vertex_range.start, surf.vertex_range.count);
 		}
 	}

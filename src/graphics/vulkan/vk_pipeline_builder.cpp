@@ -72,16 +72,27 @@ void GraphicsPipelineBuilder::SetRasterState(Raster raster_state)
 	}
 }
 
-void GraphicsPipelineBuilder::SetSwapchainFormat(VkFormat format)
+void GraphicsPipelineBuilder::SetSwapchainFormat(VkFormat color_format, VkFormat depth_format)
 {
-	attachment_formats.push_back(format);
+	attachment_formats.push_back(color_format);
+	this->depth_format = depth_format;
 }
 
-void GraphicsPipelineBuilder::SetAttachmentFormats(std::vector<bf::Texture::Format> formats)
+/*void GraphicsPipelineBuilder::SetAttachmentFormats(std::vector<bf::Texture::Format> formats)
 {
 	attachment_formats.reserve(formats.size());
 	for (auto format: formats)
 		attachment_formats.push_back(vk::ConvertEnum(format));
+}*/
+
+void GraphicsPipelineBuilder::SetFramebuffer(const Framebuffer &framebuffer)
+{
+	attachment_formats.reserve(framebuffer.color_textures.size());
+	for (auto texture: framebuffer.color_textures)
+		attachment_formats.push_back(vk::ConvertEnum(texture.format));
+
+	if (framebuffer.depth_texture)
+		depth_format = vk::ConvertEnum(framebuffer.depth_texture.format);
 }
 
 void GraphicsPipelineBuilder::AppendShader(VkShaderStageFlagBits stage, VkShaderModule module)
@@ -191,8 +202,9 @@ VkPipeline GraphicsPipelineBuilder::CreateVertexShaderStage(const std::string &n
 															ShaderReflectionData reflection_data, VkPipelineLayout *out)
 {
 	// -------------------------------
+	throw "Unimplemented";
 
-	std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> bindings;
+	/*std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> bindings;
 	std::vector<VkPushConstantRange> push_constant_ranges;
 
 	for (auto &desc: reflection_data.decriptors)
@@ -207,12 +219,6 @@ VkPipeline GraphicsPipelineBuilder::CreateVertexShaderStage(const std::string &n
 		};
 
 		bindings[desc.set].push_back(binding);
-
-		/*flat_descriptors_info.push_back(uint8_t(desc.type));
-		flat_descriptors_info.push_back(uint8_t(desc.set));
-		flat_descriptors_info.push_back(uint8_t(desc.binding));
-
-		Log() << names_map[desc.type] << desc.set << desc.binding;*/
 	}
 
 	for (auto &desc: reflection_data.constants)
@@ -266,13 +272,6 @@ VkPipeline GraphicsPipelineBuilder::CreateVertexShaderStage(const std::string &n
 		//store->descriptor_layouts.push_back(descriptor_set_layout);
 	}
 
-	/*VkPushConstantRange push_constant_range
-	{
-		.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-		.offset = 0,
-		.size = sizeof(float) * 4,
-	};*/
-
 	VkPipelineLayoutCreateInfo pipeline_layout_ci =
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -286,7 +285,7 @@ VkPipeline GraphicsPipelineBuilder::CreateVertexShaderStage(const std::string &n
 
 	VkPipelineLayout layout;
 	vkCreatePipelineLayout(device, &pipeline_layout_ci, nullptr, &layout);
-	*out = layout;
+	*out = layout;*/
 
 	// -------------------------------
 
@@ -381,8 +380,9 @@ VkPipeline GraphicsPipelineBuilder::CreateFragmentShaderStage(const std::string 
 															  ShaderReflectionData reflection_data, VkPipelineLayout *out)
 {
 	// -------------------------------
+	throw "Unimplemented";
 
-	std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> bindings;
+	/*std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> bindings;
 	std::vector<VkPushConstantRange> push_constant_ranges;
 
 	for (uint32_t i = 0; i < reflection_data.max_set; i++)
@@ -400,12 +400,6 @@ VkPipeline GraphicsPipelineBuilder::CreateFragmentShaderStage(const std::string 
 		};
 
 		bindings[desc.set].push_back(binding);
-
-		/*flat_descriptors_info.push_back(uint8_t(desc.type));
-		flat_descriptors_info.push_back(uint8_t(desc.set));
-		flat_descriptors_info.push_back(uint8_t(desc.binding));
-
-		Log() << names_map[desc.type] << desc.set << desc.binding;*/
 	}
 
 	for (auto &desc: reflection_data.constants)
@@ -459,13 +453,6 @@ VkPipeline GraphicsPipelineBuilder::CreateFragmentShaderStage(const std::string 
 		//store->descriptor_layouts.push_back(descriptor_set_layout);
 	}
 
-	/*VkPushConstantRange push_constant_range
-	{
-		.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-		.offset = 0,
-		.size = sizeof(float) * 4,
-	};*/
-
 	VkPipelineLayoutCreateInfo pipeline_layout_ci =
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -479,7 +466,7 @@ VkPipeline GraphicsPipelineBuilder::CreateFragmentShaderStage(const std::string 
 
 	VkPipelineLayout layout;
 	vkCreatePipelineLayout(device, &pipeline_layout_ci, nullptr, &layout);
-	*out = layout;
+	*out = layout;*/
 
 	// -------------------------------
 
@@ -769,11 +756,11 @@ VkPipeline GraphicsPipelineBuilder::Build(VkDevice device, VkPipelineCache pipel
 		.viewMask = 0,
 		.colorAttachmentCount = uint32_t(attachment_formats.size()),
 		.pColorAttachmentFormats = attachment_formats.data(),
-		.depthAttachmentFormat = vk::ConvertEnum(Texture::Format::D24S8), // TODO: if depth buffer is not present
+		.depthAttachmentFormat = depth_format, // TODO: if depth buffer is not present
 		.stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
 	};
 
-	std::array dynamic_states { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	std::array dynamic_states { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_CULL_MODE };
 
 	VkPipelineDynamicStateCreateInfo dynamic_state_ci
 	{

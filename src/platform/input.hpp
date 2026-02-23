@@ -1,5 +1,6 @@
 #pragma once
 #include "core/defines.hpp"
+#include "core/log.hpp"
 #include <SDL3/SDL_gamepad.h>
 #include <SDL3/SDL_scancode.h>
 #include <cstdint>
@@ -16,9 +17,9 @@ public:
 	virtual ~InputHandler() = default;
 	virtual void KeyDown(uint32_t key) = 0;
 	virtual void KeyUp(uint32_t key) = 0;
-	virtual void MouseDown(int button) {};
-	virtual void MouseUp(int button) {};
-	virtual void MouseMove(float x, float y, float dx, float dy) {};
+	virtual void MouseDown(int button) = 0;
+	virtual void MouseUp(int button) = 0;
+	virtual void MouseMove(float x, float y, float dx, float dy) = 0;
 	virtual void GamepadAxis(int axis, int value) {};
 	virtual void GamepadButton() {};
 };
@@ -29,6 +30,7 @@ public:
 	Input()
 	{
 		std::fill(keys.begin(), keys.end(), {});
+		std::fill(buttons.begin(), buttons.end(), {});
 	}
 
 	void KeyDown(uint32_t key) override
@@ -55,6 +57,22 @@ public:
 		//keys[key].just_pressed = 0;
 		keys[key].just_released = 1;
 		keys[key].pressed = 0;
+	}
+
+	void MouseDown(int button) override
+	{
+		kbm = true;
+
+		buttons[button].just_pressed = 1;
+		buttons[button].pressed = 1;
+	}
+
+	void MouseUp(int button) override
+	{
+		kbm = true;
+
+		buttons[button].just_released = 1;
+		buttons[button].pressed = 0;
 	}
 
 	void MouseMove(float x, float y, float dx, float dy) override
@@ -87,6 +105,12 @@ public:
 			keys[i].just_pressed = 0;
 			keys[i].just_released = 0;
 		}
+
+		for (int i = 0; i < 6; i++)
+		{
+			buttons[i].just_pressed = 0;
+			buttons[i].just_released = 0;
+		}
 	}
 
 	int8_t KeyPressed(uint32_t key)
@@ -102,6 +126,16 @@ public:
 	int8_t KeyJustReleased(uint32_t key)
 	{
 		return keys[key].just_released;
+	}
+
+	int8_t MouseButtonJustPressed(uint32_t button)
+	{
+		return buttons[button].just_pressed;
+	}
+
+	int8_t MouseButtonJustReleased(uint32_t button)
+	{
+		return buttons[button].just_released;
 	}
 
 	const glm::vec2 MousePos() const
@@ -142,11 +176,19 @@ private:
 		uint8_t just_released: 1 = 0;
 	};
 
+	struct MouseButtonState
+	{
+		uint8_t pressed: 1 = 0;
+		uint8_t just_pressed: 1 = 0;
+		uint8_t just_released: 1 = 0;
+	};
+
 	bool kbm = true;
 
 	glm::vec2 mouse_delta {};
 	glm::vec2 mouse_pos {};
 	std::array<KeyState, SDL_SCANCODE_COUNT> keys;
+	std::array<MouseButtonState, 6> buttons;
 
 	glm::vec2 left_stick {};
 	glm::vec2 right_stick {};

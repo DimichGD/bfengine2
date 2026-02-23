@@ -57,6 +57,7 @@ bool WindowSDL3::CreateOpenGL(int major, int minor)
 {
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
+	//SDL_GL_SetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, 1);
 
 	if (config->render.debug && major > 3)
 	{
@@ -260,7 +261,7 @@ void WindowSDL3::CaptureMouse(bool capture)
 bool WindowSDL3::SetSwapInterval(int interval)
 {
 	if (stuff->ctx)
-		return (SDL_GL_SetSwapInterval(interval) == 0);
+		return (SDL_GL_SetSwapInterval(interval));
 
 	else
 		return true;

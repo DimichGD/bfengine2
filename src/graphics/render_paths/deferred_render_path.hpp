@@ -8,17 +8,17 @@ BF_BEGIN_NAMESPACE
 class Deferred
 {
 public:
-	Deferred(RenderDeviceVK *device, Config *config, ResourceManager *resources);
+	Deferred(RenderDeviceGL *device, Config *config, ResourceManager *resources);
 	BF_NON_MOVABLE(Deferred)
 	BF_NON_COPYABLE(Deferred)
 
-	void Create(GraphicsContext *context);
+	void Create(GraphicsContext *context, FramebufferID out_fbo);
 	void Destroy();
 	void Render(std::vector<Mesh> &meshes);
-	FramebufferID GetFramebuffer() const { return gbuffer; }
+	/*FramebufferID GetFramebuffer() const { return gbuffer; }
 	Texture GetColorTexture(uint32_t index) { return device->GetFramebuffer(gbuffer).color_textures[index]; }
 	std::vector<Texture> GetColorTextures() { return device->GetFramebuffer(gbuffer).color_textures; }
-	Texture GetDepthTexture() const { return device->GetFramebuffer(gbuffer).depth_texture; }
+	Texture GetDepthTexture() const { return device->GetFramebuffer(gbuffer).depth_texture; }*/
 
 	/*MaterialID CreateMaterial()
 	{
@@ -31,14 +31,15 @@ public:
 		return materials.at(mat_id.handle);
 	}*/
 
-private:
-	RenderDeviceVK *device = nullptr;
+//private:
+	//RenderDeviceVK *device = nullptr;
+	RenderDeviceGL *device = nullptr;
 	Config *config = nullptr;
 	ResourceManager *resources = nullptr;
 	GraphicsContext *context = nullptr;
 
 	PipelineID pipeline {};
-	FramebufferID gbuffer {};
+	//FramebufferID gbuffer {};
 	//FramebufferID light_buffer {};
 	uint32_t width = 0;
 	uint32_t height = 0;

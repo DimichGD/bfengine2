@@ -4,7 +4,7 @@
 BF_BEGIN_NAMESPACE
 BF_BEGIN_VK_NAMESPACE
 
-VkShaderStageFlagBits ConvertEnum(Shader::Type type)
+VkShaderStageFlags ConvertEnum(Shader::Type type)
 {
 	switch (type)
 	{
@@ -12,6 +12,7 @@ VkShaderStageFlagBits ConvertEnum(Shader::Type type)
 		case Shader::Type::FRAGMENT: return VK_SHADER_STAGE_FRAGMENT_BIT;
 		case Shader::Type::GEOMETRY: return VK_SHADER_STAGE_GEOMETRY_BIT;
 		case Shader::Type::COMPUTE:  return VK_SHADER_STAGE_COMPUTE_BIT;
+		case Shader::Type::VERTEX_FRAGMENT: return VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 	}
 
 	return {};
@@ -91,10 +92,10 @@ VkImageLayout ConvertEnum(ImageLayout layout)
 	{
 		case ImageLayout::UNDEFINED:                return VK_IMAGE_LAYOUT_UNDEFINED;
 		case ImageLayout::COLOR_ATTACHMENT:         return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		case ImageLayout::DEPTH:                    return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+		case ImageLayout::DEPTH_ATTACHMENT:         return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
 		case ImageLayout::DEPTH_STENCIL_ATTACHMENT: return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-		case ImageLayout::SHADER_READ_ONLY:         return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		case ImageLayout::DEPTH_READ:               return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		case ImageLayout::COLOR_READ_ONLY:          return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		case ImageLayout::DEPTH_STENCIL_READ_ONLY:  return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		case ImageLayout::PRESENT:                  return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 	}
 

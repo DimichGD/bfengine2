@@ -8,7 +8,7 @@ BF_BEGIN_NAMESPACE
 class Debug
 {
 public:
-	Debug(RenderDeviceVK *device, Config *config, ResourceManager *resources);
+	Debug(RenderDevice *device, Config *config, ResourceManager *resources);
 	BF_NON_MOVABLE(Debug)
 	BF_NON_COPYABLE(Debug)
 
@@ -17,7 +17,8 @@ public:
 	void Render(std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2);
 
 private:
-	RenderDeviceVK *device = nullptr;
+	//RenderDeviceVK *device = nullptr;
+	RenderDevice *device = nullptr;
 	Config *config = nullptr;
 	ResourceManager *resources = nullptr;
 	GraphicsContext *context = nullptr;

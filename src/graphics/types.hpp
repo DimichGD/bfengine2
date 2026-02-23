@@ -174,65 +174,15 @@ struct GPUBuffer: Handle
 	Type type = {};
 };
 
-struct Descriptor2
-{
-	enum class Set: uint8_t
-	{
-		SCENE,
-		MATERIAL,
-		OBJECT,
-	};
-
-	enum class Type: uint8_t
-	{
-		UNIFORM_BUFFER,
-		STORAGE_BUFFER,
-		TEXTURE,
-	};
-
-	Descriptor2() = delete;
-	Descriptor2(uint8_t set, uint8_t binding, Type type, uint8_t array_size)
-	{
-		this->set = set;
-		this->binding = binding;
-		this->type = type;
-		this->array_size = array_size;
-	}
-
-	uint32_t Hash()
-	{
-		return set | (binding << 8) | (uint8_t(type) << 16) | (array_size << 24);
-	}
-
-	uint8_t set;
-	uint8_t binding;
-	Type type;
-	uint8_t array_size;
-};
-
-struct Constant
-{
-	enum class Type
-	{
-		INT,
-		VEC4,
-	};
-
-	uint32_t offset = 0;
-	uint32_t size = 0;
-	Type type;
-};
-
-struct DescriptorSet: Handle {};
-
 struct Shader: Handle
 {
-	enum class Type
+	enum class Type: uint8_t
 	{
-		VERTEX,
-		FRAGMENT,
-		GEOMETRY,
-		COMPUTE,
+		VERTEX   = 1 << 0,
+		FRAGMENT = 1 << 1,
+		GEOMETRY = 1 << 2,
+		COMPUTE  = 1 << 3,
+		VERTEX_FRAGMENT = VERTEX | FRAGMENT,
 	};
 
 	Shader(uint32_t handle, Type type)
@@ -250,12 +200,87 @@ struct Shader: Handle
 	Type type;
 };
 
+struct Descriptor2
+{
+	enum class Set: uint8_t
+	{
+		SCENE,
+		MATERIAL,
+		OBJECT,
+	};
+
+	enum class Type: uint8_t
+	{
+		UNIFORM_BUFFER,
+		STORAGE_BUFFER,
+		TEXTURE,
+	};
+
+	Descriptor2() = delete;
+	Descriptor2(uint8_t set, uint8_t binding, Type type, uint8_t array_size, Shader::Type stage)
+	{
+		this->set = set;
+		this->binding = binding;
+		this->type = type;
+		this->array_size = array_size;
+		this->stage = stage;
+	}
+
+	bool CompareWithoutStage(const Descriptor2 &other) const // FIXME: better naming
+	{
+		return
+			set == other.set &&
+			binding == other.binding &&
+			type == other.type &&
+			array_size == other.array_size;
+	}
+
+	/*bool operator==(const Descriptor2 &other) const // FIXME: make another method for this
+	{
+		return
+			set == other.set &&
+			binding == other.binding &&
+			type == other.type &&
+			array_size == other.array_size;// &&
+			//stage == other.stage;
+	}*/
+
+	uint32_t Hash() const
+	{
+		return set | (binding << 4) | (uint8_t(type) << 8) | (array_size << 16) | (uint8_t(stage) << 24);
+	}
+
+	uint8_t set: 4 = 0;
+	uint8_t binding: 4 = 0;
+	Type type = Type::UNIFORM_BUFFER;
+	uint8_t array_size = 0;
+	Shader::Type stage = Shader::Type::VERTEX;
+};
+
+struct Constant
+{
+	enum class Type
+	{
+		INT,
+		VEC4,
+	};
+
+	uint32_t offset = 0;
+	uint32_t size = 0;
+	Type type;
+};
+
+struct DescriptorSet: Handle {};
+
 struct ShaderReflectionData
 {
-	std::vector<Descriptor2> decriptors;
+	std::string name;
+	//std::vector<Descriptor2> decriptors;
 	std::vector<Constant> constants;
 	uint32_t max_set = 0;
-	Shader::Type type;
+	Shader::Type stage;
+
+	std::array<std::vector<Descriptor2>, 4> sets {};
 };
 
 struct Uniform
@@ -363,10 +388,10 @@ enum class ImageLayout
 {
 	UNDEFINED,
 	COLOR_ATTACHMENT,
-	DEPTH,
+	DEPTH_ATTACHMENT,
 	DEPTH_STENCIL_ATTACHMENT,
-	SHADER_READ_ONLY,
-	DEPTH_READ,
+	COLOR_READ_ONLY,
+	DEPTH_STENCIL_READ_ONLY,
 	PRESENT,
 };
 
@@ -469,9 +494,6 @@ struct FramebufferDesc
 {
 	uint32_t width = 0;
 	uint32_t height = 0;
-	/*uint32_t color_texture_count = 0;
-	Texture::Format color_format {};
-	Texture::Format depth_format {};*/
 	std::vector<Texture> color_textures {};
 	Texture depth_texture {};
 };

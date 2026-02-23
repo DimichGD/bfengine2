@@ -15,7 +15,6 @@
 #include <map>
 
 BF_BEGIN_NAMESPACE
-#define BF_RENDER_DEVICE_STOP this->stop = true; return;
 
 BF_BEGIN_VK_NAMESPACE
 struct Shader
@@ -37,8 +36,8 @@ struct RenderDeviceVK::Storage
 
 	//std::vector<VkPipelineLayout> pipeline_layouts;
 	std::vector<VkDescriptorPool> descriptor_pools;
-	//std::vector<VkDescriptorSetLayout> descriptor_layouts;
 	std::vector<VkDescriptorSet> descriptor_sets;
+	std::map<uint32_t, VkDescriptorSetLayout> descriptor_set_layouts;
 
 	std::vector<vk::Buffer> buffers;
 	std::vector<vk::Texture> textures;
@@ -72,7 +71,7 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 	vk->CreateDevice();
 	vk->CreateSwapchain();
 
-	for (uint32_t i = 0; i < vk->frames.size(); i++)
+/*	for (uint32_t i = 0; i < vk->frames.size(); i++)
 		swapchain_image_prev_layouts.push_back(ImageLayout::UNDEFINED);
 
 	TextureDesc depth_texture_desc
@@ -87,7 +86,7 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 	};
 	Texture depth_texture_handle = CreateTexture("Backbuffer Depth Texture", depth_texture_desc);
 	//vk->depth_texture = store->textures.at(depth_texture_handle.handle);
-	vk->depth_texture_fffuuu = depth_texture_handle;
+	vk->depth_texture_fffuuu = depth_texture_handle;*/
 
 	VkPhysicalDeviceProperties props;
 	vkGetPhysicalDeviceProperties(vk->phys_device, &props);
@@ -303,13 +302,16 @@ void RenderDeviceVK::Destroy()
 	vkDestroyShaderModule(vk->device, store->shaders[1], nullptr);
 	vkDestroyRenderPass(vk->device, vk->render_pass, nullptr);*/
 
+	for (auto &decriptor_set_layout: store->descriptor_set_layouts)
+		vkDestroyDescriptorSetLayout(vk->device, decriptor_set_layout.second, nullptr);
+
 	for (auto pipeline: store->pipelines)
 	{
 		vkDestroyPipeline(vk->device, pipeline.pipeline, nullptr);
 		vkDestroyPipelineLayout(vk->device, pipeline.layout, nullptr);
 
-		for (auto decriptor_set_layout: pipeline.decriptor_set_layouts)
-			vkDestroyDescriptorSetLayout(vk->device, decriptor_set_layout, nullptr);
+		//for (auto decriptor_set_layout: pipeline.decriptor_set_layouts)
+		//	vkDestroyDescriptorSetLayout(vk->device, decriptor_set_layout, nullptr);
 	}
 
 	vkDestroySwapchainKHR(vk->device, vk->swapchain, nullptr);
@@ -412,7 +414,7 @@ Shader RenderDeviceVK::LoadShader(Shader::Type type, const std::string &name)
 		}
 	}
 
-	ShaderReflectionData reflection_data = vk::GetShaderReflection(type, binary.data(), binary.size());
+	ShaderReflectionData reflection_data = vk::GetShaderReflection(name, type, binary.data(), binary.size());
 
 	VkShaderModuleCreateInfo shader_ci
 	{
@@ -443,6 +445,7 @@ PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const Pipelin
 	vk::Pipeline pipeline;
 
 	pipeline.layout = vk::CreatePipelineLayout(vk->device,
+		store->descriptor_set_layouts,
 		{ &store->shader_reflection[desc.shaders[0].handle], &store->shader_reflection[desc.shaders[1].handle] },
 		pipeline.decriptor_set_layouts, 0);
 
@@ -463,14 +466,16 @@ PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const Pipelin
 	builder.SetLayout(pipeline.layout);
 
 	if (desc.framebuffer_id)
-		builder.SetAttachmentFormats(store->framebuffers[desc.framebuffer_id.handle].color_formats);
+		builder.SetFramebuffer(GetFramebuffer(desc.framebuffer_id));
+		//builder.SetAttachmentFormats(store->framebuffers[desc.framebuffer_id.handle].color_formats);
 	else
-		builder.SetSwapchainFormat(vk->swapchain_format);
+		builder.SetSwapchainFormat(vk->swapchain_format, VK_FORMAT_UNDEFINED);
+		//builder.SetSwapchainFormat(vk->swapchain_format, vk::ConvertEnum(vk->depth_texture_fffuuu.format));
 
 	//builder.CreateFragmentOutputStage(desc.raster);
 
 	for (const Shader &shader: desc.shaders)
-		builder.AppendShader(vk::ConvertEnum(shader.type), store->shader_modules[shader.handle]);
+		builder.AppendShader(VkShaderStageFlagBits(vk::ConvertEnum(shader.type)), store->shader_modules[shader.handle]);
 
 	pipeline.pipeline = builder.Build(vk->device, VK_NULL_HANDLE); // TODO: measure pipeline cache speedup if any
 	if (pipeline.pipeline == VK_NULL_HANDLE)
@@ -485,13 +490,13 @@ PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const Pipelin
 void RenderDeviceVK::Test()
 {
 	vk::GraphicsPipelineBuilder builder(vk->device);
-	builder.SetSwapchainFormat(vk->swapchain_format);
+	builder.SetSwapchainFormat(vk->swapchain_format, VK_FORMAT_D24_UNORM_S8_UINT);
 
 	File vs_file(fs->GetDataPath() + "shaders/cache/ui_vk_texture_vert.spv");
 	vs_file.Open();
 	std::vector<uint32_t> vs_binary(vs_file.Size() / 4);
 	vs_file.Read(vs_binary.data(), vs_file.Size());
-	auto vs_reflection = vk::GetShaderReflection(Shader::Type::VERTEX, vs_binary.data(), vs_binary.size());
+	auto vs_reflection = vk::GetShaderReflection("ui_vk_texture_vert.spv", Shader::Type::VERTEX, vs_binary.data(), vs_binary.size());
 	std::vector<VkDescriptorSetLayout> vs_decriptor_set_layouts;
 	//VkPipelineLayout vs_layout = vk::CreatePipelineLayout(vk->device, { &vs_reflection }, vs_decriptor_set_layouts);
 
@@ -499,7 +504,7 @@ void RenderDeviceVK::Test()
 	fs_file.Open();
 	std::vector<uint32_t> fs_binary(fs_file.Size() / 4);
 	fs_file.Read(fs_binary.data(), fs_file.Size());
-	auto fs_reflection = vk::GetShaderReflection(Shader::Type::VERTEX, fs_binary.data(), fs_binary.size());
+	auto fs_reflection = vk::GetShaderReflection("ui_vk_texture_frag.spv", Shader::Type::VERTEX, fs_binary.data(), fs_binary.size());
 	std::vector<VkDescriptorSetLayout> fs_decriptor_set_layouts;
 	//VkPipelineLayout fs_layout = vk::CreatePipelineLayout(vk->device, { &fs_reflection }, fs_decriptor_set_layouts);
 
@@ -517,7 +522,9 @@ void RenderDeviceVK::Test()
 	linking_info.pLibraries   = stages.data();
 
 	std::vector<VkDescriptorSetLayout> decriptor_set_layouts;
-	VkPipelineLayout combined_layout = vk::CreatePipelineLayout(vk->device, { &vs_reflection, &fs_reflection },
+	VkPipelineLayout combined_layout = vk::CreatePipelineLayout(vk->device,
+													store->descriptor_set_layouts,
+													{ &vs_reflection, &fs_reflection },
 													decriptor_set_layouts, VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
 	vk->SetObjectName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, combined_layout, "combined_layout");
 	vk->SetObjectName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, vs_layout, "vertex_layout");
@@ -569,10 +576,10 @@ void RenderDeviceVK::BeginFrame()
 	vkResetCommandBuffer(vk->current_command_buffer, 0);
 	vkBeginCommandBuffer(vk->current_command_buffer, &beginInfo);
 
-	for (auto resource: tracked_resources)
-		resource.second.prev = ImageLayout::UNDEFINED;
+	//for (auto resource: tracked_resources)
+	//	resource.second.prev = ImageLayout::UNDEFINED;
 
-	swapchain_image_prev_layouts[vk->image_index] = ImageLayout::UNDEFINED;
+	//swapchain_image_prev_layouts[vk->image_index] = ImageLayout::UNDEFINED;
 }
 
 
@@ -616,8 +623,10 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 	else
 	{
 		color_image_views.push_back(vk->frames[vk->image_index].texture.image_view);
-		depth_image_view = store->textures.at(vk->depth_texture_fffuuu.handle).image_view;
-		depth_layout = store->textures.at(vk->depth_texture_fffuuu.handle).layout;
+		//depth_image_view = store->textures.at(vk->depth_texture_fffuuu.handle).image_view;
+		//depth_layout = store->textures.at(vk->depth_texture_fffuuu.handle).layout;
+		depth_image_view = VK_NULL_HANDLE;
+		depth_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		width = vk->width;
 		height = vk->height;
 	}
@@ -671,7 +680,7 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 		.viewMask = 0,
 		.colorAttachmentCount = uint32_t(color_attachments.size()),
 		.pColorAttachments = color_attachments.data(),
-		.pDepthAttachment = &depth_attachment,
+		.pDepthAttachment = bool(framebuffer_id) ? &depth_attachment : nullptr,
 		.pStencilAttachment = nullptr
 	};
 
@@ -687,6 +696,23 @@ void RenderDeviceVK::SetViewport(glm::ivec4 viewport)
 	VkRect2D vk_scissor { { viewport.x, viewport.y }, { uint32_t(viewport.z), uint32_t(viewport.w) } };
 	vkCmdSetViewport(vk->current_command_buffer, 0, 1, &vk_viewport);
 	vkCmdSetScissor(vk->current_command_buffer, 0, 1, &vk_scissor);
+}
+
+void RenderDeviceVK::SetCullMode(uint32_t mode)
+{
+	//VK_CULL_MODE_NONE = 0,
+	//VK_CULL_MODE_FRONT_BIT = 0x00000001,
+	//VK_CULL_MODE_BACK_BIT = 0x00000002,
+	//VK_CULL_MODE_FRONT_AND_BACK = 0x00000003,
+	VkCullModeFlags cull_mode = VK_CULL_MODE_NONE;
+	switch (mode)
+	{
+		case 1:  cull_mode = VK_CULL_MODE_FRONT_BIT; break;
+		case 2:  cull_mode = VK_CULL_MODE_BACK_BIT; break;
+		case 3:  cull_mode = VK_CULL_MODE_FRONT_AND_BACK; break;
+	}
+
+	vkCmdSetCullMode(vk->current_command_buffer, cull_mode);
 }
 
 void RenderDeviceVK::EndRenderPass(FramebufferID framebuffer_id)
@@ -706,11 +732,8 @@ void RenderDeviceVK::EndRenderPass(FramebufferID framebuffer_id)
 	}
 }
 
-bool RenderDeviceVK::EndFrame()
+void RenderDeviceVK::EndFrame()
 {
-	if (stop)
-		return false;
-
 	//LayoutTransition({}, ImageLayout::COLOR_ATTACHMENT, ImageLayout::PRESENT);
 
 	vkEndCommandBuffer(vk->current_command_buffer);
@@ -772,8 +795,6 @@ bool RenderDeviceVK::EndFrame()
 
 	//vk->frame_index = (vk->frame_index + 1) % vk->frames.size();
 	vk->current_command_buffer = vk->frames[vk->frame_index].command_buffer;
-
-	return true;
 }
 
 void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLayout to)
@@ -822,8 +843,8 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 			src_access_mask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
 			break;
 
-		case ImageLayout::DEPTH:
-			Log() << "Depth layout is not implemented";
+		case ImageLayout::DEPTH_ATTACHMENT:
+			Warn() << "DEPTH_ATTACHMENT 'from' case is not implemented";
 			break;
 
 		case ImageLayout::DEPTH_STENCIL_ATTACHMENT:
@@ -831,43 +852,43 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 			src_access_mask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			break;
 
-		case ImageLayout::SHADER_READ_ONLY:
+		case ImageLayout::COLOR_READ_ONLY:
 			break;
 
-		case ImageLayout::DEPTH_READ:
+		case ImageLayout::DEPTH_STENCIL_READ_ONLY:
 			break; // TODO: implement
 
 		case ImageLayout::PRESENT:
-			Log() << "Can't convert from PRESENT layout";
+			Warn() << "Can't convert from PRESENT layout";
 			return;
 	}
 
 	switch (to)
 	{
 		case ImageLayout::UNDEFINED:
-			Log() << "Can't convert to UNDEFINED layout";
-			return;
+			Warn() << "Can't convert to UNDEFINED layout";
+			break;
 
 		case ImageLayout::COLOR_ATTACHMENT:
 			dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
 			dst_access_mask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
 			break;
 
-		case ImageLayout::DEPTH:
-			Log() << "Depth layout is not implemented";
-			return;
+		case ImageLayout::DEPTH_ATTACHMENT:
+			Warn() << "DEPTH_ATTACHMENT 'to' case is not implemented";
+			break;
 
 		case ImageLayout::DEPTH_STENCIL_ATTACHMENT:
 			dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
 			dst_access_mask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			break;
 
-		case ImageLayout::SHADER_READ_ONLY:
+		case ImageLayout::COLOR_READ_ONLY:
 			dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT; // VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT if color
 			dst_access_mask = VK_ACCESS_2_SHADER_READ_BIT; // VK_ACCESS_2_NONE if color
 			break;
 
-		case ImageLayout::DEPTH_READ:
+		case ImageLayout::DEPTH_STENCIL_READ_ONLY:
 			dst_stage_mask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
 			dst_access_mask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
 			break; // TODO: implement
@@ -1010,7 +1031,7 @@ DescriptorSet RenderDeviceVK::CreateDescriptorSet(PipelineID pipeline, Descripto
 		.pNext = nullptr,
 		.descriptorPool = store->descriptor_pool,
 		.descriptorSetCount = 1,
-		.pSetLayouts = &store->pipelines.at(pipeline.handle).decriptor_set_layouts[uint32_t(set)],
+		.pSetLayouts = &store->pipelines.at(pipeline.handle).decriptor_set_layouts.at(uint32_t(set)),
 		//.pSetLayouts = &store->descriptor_layouts.at(std::to_underlying(set)),
 	};
 
@@ -1098,12 +1119,6 @@ void RenderDeviceVK::WriteDescriptor(DescriptorSet set, uint32_t binding, Textur
 
 void RenderDeviceVK::BindDescriptorSet(Descriptor2::Set set, DescriptorSet index)
 {
-	if (uint32_t(set) >= store->current_pipeline.decriptor_set_layouts.size())
-	{
-		Error() << "set" << int(set) << ">= store->current_pipeline.decriptor_set_layouts.size()";
-		BF_RENDER_DEVICE_STOP
-	}
-
 	vkCmdBindDescriptorSets(vk->current_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 					store->current_pipeline.layout, uint32_t(set), 1, &store->descriptor_sets.at(index.handle), 0, nullptr);
 }
@@ -1114,6 +1129,7 @@ void RenderDeviceVK::BindDescriptorSet(Descriptor2::Set set, DescriptorSet index
 					offset, sizeof(glm::vec4), glm::value_ptr(value));
 }*/
 
+// TODO: make flags for all(graphics) stages
 void RenderDeviceVK::Push(Shader::Type type, uint32_t offset, int value)
 {
 	vkCmdPushConstants(vk->current_command_buffer, store->current_pipeline.layout, vk::ConvertEnum(type),
@@ -1320,7 +1336,7 @@ FramebufferID RenderDeviceVK::CreateFramebuffer(const FramebufferDesc &desc)
 
 	//Texture depth_texture = CreateTexture(texture_desc, false);
 	//framebuffer.depth_texture = CreateTexture(texture_desc, false);
-	framebuffer.depth_texture = desc.depth_texture,
+	framebuffer.depth_texture = desc.depth_texture;
 	//SetDebugName(framebuffer.depth_texture, "Depth Render Target");
 
 	store->framebuffers.push_back(framebuffer);
@@ -1332,10 +1348,10 @@ Framebuffer RenderDeviceVK::GetFramebuffer(FramebufferID framebuffer)
 	return store->framebuffers[framebuffer.handle];
 }
 
-Texture RenderDeviceVK::GetDepthTexture()
+/*Texture RenderDeviceVK::GetDepthTexture()
 {
 	return vk->depth_texture_fffuuu;
-}
+}*/
 
 /*void RenderDeviceVK::SetDepthTexture(Texture depth_texture)
 {
@@ -1348,23 +1364,5 @@ Texture RenderDeviceVK::GetDepthTexture()
 	vk->SetObjectName(VK_OBJECT_TYPE_IMAGE, store->textures.at(texture.handle).image, name);
 }*/
 
-void RenderDeviceVK::SetTrackedResource(Texture texture)
-{
-	tracked_resources[texture] = {};
-}
-
-void RenderDeviceVK::ResetResourceTransition(Texture texture)
-{
-	tracked_resources[texture].prev = ImageLayout::UNDEFINED;
-}
-
-void RenderDeviceVK::MakeResourceTransition(Texture texture, ImageLayout next_layout)
-{
-	if (tracked_resources[texture].prev == next_layout)
-		return;
-
-	LayoutTransition(texture, tracked_resources[texture].prev, next_layout);
-	tracked_resources[texture].prev = next_layout;
-}
 
 BF_END_NAMESPACE

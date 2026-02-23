@@ -4,7 +4,7 @@
 layout(location = 0) in vec3 IN_POSITION;
 layout(location = 1) in vec2 IN_TEXCOORD_0;
 
-layout(std140, set = 0, binding = 0) uniform Camera
+layout(std140, binding = 0) uniform Camera
 {
 	mat4 U_PROJ_MATRIX;
 };

@@ -1,8 +1,9 @@
 #include "point_light_render_path.hpp"
+#include "graphics/geometry.hpp"
 
 BF_BEGIN_NAMESPACE
 
-PointLightRenderPath::PointLightRenderPath(RenderDeviceVK *device, Config *config, ResourceManager *resources)
+PointLightRenderPath::PointLightRenderPath(RenderDeviceGL *device, Config *config, ResourceManager *resources)
 {
 	this->device = device;
 	this->config = config;
@@ -13,14 +14,15 @@ PointLightRenderPath::PointLightRenderPath(RenderDeviceVK *device, Config *confi
 
 void PointLightRenderPath::Create(GraphicsContext *context, const std::vector<Texture> &textures, Texture depth_texture, FramebufferID out_fbo)
 {
-	Shader vs = device->LoadShader(Shader::Type::VERTEX, "deferred/vk_point_light");
-	Shader fs = device->LoadShader(Shader::Type::FRAGMENT, "deferred/vk_point_light");
+	const char *deferred_light_shader_name = config->render.api == Config::Render::API::VK ? "deferred/vk_point_light" : "deferred/gl_point_light";
+	Shader vs = device->LoadShader(Shader::Type::VERTEX, deferred_light_shader_name);
+	Shader fs = device->LoadShader(Shader::Type::FRAGMENT, deferred_light_shader_name);
 
 	PipelineDesc pipeline_desc
 	{
 		.shaders = { vs, fs },
 		.topology = Topology::TRIANGLES,
-		.vertex_attribs = Vertex::Attrib::POSITION | Vertex::Attrib::TEXCOORD_0,
+		.vertex_attribs = Vertex::Attrib::POSITION, //| Vertex::Attrib::TEXCOORD_0,
 		.raster = {
 			.blend = {},
 			.depth_test = false,
@@ -35,15 +37,15 @@ void PointLightRenderPath::Create(GraphicsContext *context, const std::vector<Te
 	material_set = device->CreateDescriptorSet(pipeline, Descriptor2::Set::MATERIAL);
 
 	device->WriteDescriptor(scene_set, 0, context->active_camera_ubo);
-	device->WriteDescriptor(scene_set, 1, context->model_matrices_ubo);
+	//device->WriteDescriptor(scene_set, 1, context->model_matrices_ubo);
 	device->WriteDescriptor(scene_set, 2, context->point_lights_ubo);
 	device->WriteDescriptor(scene_set, 3, context->camera_pos_ubo);
 
 	device->WriteDescriptor(material_set, 0, textures[0]);
 	device->WriteDescriptor(material_set, 1, textures[1]);
 	device->WriteDescriptor(material_set, 2, textures[2]);
-	device->WriteDescriptor(material_set, 3, textures[3]);
-	device->WriteDescriptor(material_set, 4, depth_texture);
+	//device->WriteDescriptor(material_set, 3, textures[3]);
+	device->WriteDescriptor(material_set, 3, depth_texture);
 
 	/*std::vector<float> quad_verts
 	{
@@ -79,6 +81,10 @@ void PointLightRenderPath::Create(GraphicsContext *context, const std::vector<Te
 	};
 
 	quad_vbo = device->CreateBuffer(GPUBuffer::VERTEX, quad_verts);
+
+	std::vector<Vertex3D> sphere_verts = GenerateSphere(16, 16);
+	sphere_vertex_count = sphere_verts.size();
+	sphere_vbo = device->CreateBuffer(GPUBuffer::VERTEX, sphere_verts);
 }
 
 void PointLightRenderPath::Destroy()
@@ -94,10 +100,11 @@ void PointLightRenderPath::Render()
 	device->BindDescriptorSet(Descriptor2::Set::SCENE, scene_set);
 	device->BindDescriptorSet(Descriptor2::Set::MATERIAL, material_set);
 
-	device->BindVertexBuffer(quad_vbo);
-	//device->Push(Shader::Type::VERTEX, 0, 0);
+	device->BindVertexBuffer(sphere_vbo);
+	device->Push(Shader::Type::VERTEX, 0, 0);
+	//device->Push(Shader::Type::VERTEX, 4, 0);
 	device->Push(Shader::Type::FRAGMENT, 4, 0);
-	device->Draw(0, 6);
+	device->Draw(0, sphere_vertex_count);
 
 	//device->EndRenderPass({});
 }
