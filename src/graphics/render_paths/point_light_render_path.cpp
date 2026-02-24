@@ -3,7 +3,7 @@
 
 BF_BEGIN_NAMESPACE
 
-PointLightRenderPath::PointLightRenderPath(RenderDeviceGL *device, Config *config, ResourceManager *resources)
+PointLightRenderPath::PointLightRenderPath(RenderDevice *device, Config *config, ResourceManager *resources)
 {
 	this->device = device;
 	this->config = config;
@@ -25,8 +25,9 @@ void PointLightRenderPath::Create(GraphicsContext *context, const std::vector<Te
 		.vertex_attribs = Vertex::Attrib::POSITION, //| Vertex::Attrib::TEXCOORD_0,
 		.raster = {
 			.blend = {},
-			.depth_test = false,
+			.depth_test = true,
 			.depth_write = false,
+			.depth_func = DepthFunc::GREATER,
 		},
 		.framebuffer_id = out_fbo,
 	};

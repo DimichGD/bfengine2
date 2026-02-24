@@ -12,7 +12,7 @@ class RenderDevice
 public:
 	virtual ~RenderDevice() = default;
 
-	virtual void Create(SDL_Window *window_handle) = 0;
+	virtual bool Create(SDL_Window *window_handle) = 0;
 	virtual void Destroy() = 0;
 	virtual void BeginRenderPass(FramebufferID framebuffer_id, RenderPass::Clear clear_flags) = 0;
 	virtual void EndRenderPass(FramebufferID framebuffer_id) = 0;

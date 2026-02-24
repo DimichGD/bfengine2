@@ -29,7 +29,7 @@ void Debug::Create(GraphicsContext *context, FramebufferID out_fbo)
 		.vertex_attribs = Vertex::Attrib::POSITION,
 		.raster = {
 			.blend = Blend::NONE,
-			.depth_test = false,
+			.depth_test = true,
 			.depth_write = false,
 		},
 		.framebuffer_id = out_fbo,

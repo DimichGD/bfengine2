@@ -4,7 +4,7 @@
 BF_BEGIN_NAMESPACE
 BF_BEGIN_VK_NAMESPACE
 
-VkShaderStageFlags ConvertEnum(Shader::Type type)
+VkShaderStageFlagBits ConvertEnum(Shader::Type type)
 {
 	switch (type)
 	{
@@ -12,7 +12,6 @@ VkShaderStageFlags ConvertEnum(Shader::Type type)
 		case Shader::Type::FRAGMENT: return VK_SHADER_STAGE_FRAGMENT_BIT;
 		case Shader::Type::GEOMETRY: return VK_SHADER_STAGE_GEOMETRY_BIT;
 		case Shader::Type::COMPUTE:  return VK_SHADER_STAGE_COMPUTE_BIT;
-		case Shader::Type::VERTEX_FRAGMENT: return VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 	}
 
 	return {};
@@ -109,6 +108,23 @@ VkDescriptorType ConvertEnum(Descriptor2::Type type)
 		case Descriptor2::Type::UNIFORM_BUFFER: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		case Descriptor2::Type::STORAGE_BUFFER: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		case Descriptor2::Type::TEXTURE:        return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	}
+
+	return {};
+}
+
+VkCompareOp ConvertEnum(DepthFunc func)
+{
+	switch (func)
+	{
+		case DepthFunc::NEVER:            return VK_COMPARE_OP_NEVER;
+		case DepthFunc::ALWAYS:           return VK_COMPARE_OP_ALWAYS;
+		case DepthFunc::LESS:             return VK_COMPARE_OP_LESS;
+		case DepthFunc::GREATER:          return VK_COMPARE_OP_GREATER;
+		case DepthFunc::EQUAL:            return VK_COMPARE_OP_EQUAL;
+		case DepthFunc::NOT_EQUAL:        return VK_COMPARE_OP_NOT_EQUAL;
+		case DepthFunc::LESS_OR_EQUAL:    return VK_COMPARE_OP_LESS_OR_EQUAL;
+		case DepthFunc::GREATER_OR_EQUAL: return VK_COMPARE_OP_GREATER_OR_EQUAL;
 	}
 
 	return {};

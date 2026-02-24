@@ -78,5 +78,22 @@ TextureFormat ConvertEnum(bf::Texture::Format value)
 	return {};
 }
 
+GLenum ConvertEnum(DepthFunc func)
+{
+	switch (func)
+	{
+		case DepthFunc::NEVER:            return GL_NEVER;
+		case DepthFunc::ALWAYS:           return GL_ALWAYS;
+		case DepthFunc::LESS:             return GL_LESS;
+		case DepthFunc::GREATER:          return GL_GREATER;
+		case DepthFunc::EQUAL:            return GL_EQUAL;
+		case DepthFunc::NOT_EQUAL:        return GL_NOTEQUAL;
+		case DepthFunc::LESS_OR_EQUAL:    return GL_LEQUAL;
+		case DepthFunc::GREATER_OR_EQUAL: return GL_GEQUAL;
+	}
+
+	return {};
+}
+
 BF_END_GL_NAMESPACE
 BF_END_NAMESPACE

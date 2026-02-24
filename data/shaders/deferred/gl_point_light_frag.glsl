@@ -1,12 +1,12 @@
 #version 460 core
 #pragma shader_stage(fragment)
 
-layout(std140, set = 0, binding = 2) uniform Lights
+layout(std140, binding = 2) uniform Lights
 {
 	vec4 U_POINT_LIGHTS[1];
 };
 
-layout(std140, set = 0, binding = 3) uniform Camera
+layout(std140, binding = 3) uniform Camera2
 {
 	mat4 U_INV_PROJ_MATRIX;
 	mat4 U_INV_VIEW_MATRIX;
@@ -14,15 +14,17 @@ layout(std140, set = 0, binding = 3) uniform Camera
 	vec2 inv_viewport;
 };
 
-layout(set = 1, binding = 0) uniform sampler2D diffuse_map;
-layout(set = 1, binding = 1) uniform sampler2D normal_map;
-layout(set = 1, binding = 2) uniform sampler2D specular_map;
-layout(set = 1, binding = 3) uniform sampler2D depth_map;
+layout(binding = 0) uniform sampler2D diffuse_map;
+layout(binding = 1) uniform sampler2D normal_map;
+layout(binding = 2) uniform sampler2D specular_map;
+layout(binding = 3) uniform sampler2D depth_map;
 
-layout(push_constant) uniform Constants
+/*layout(push_constant) uniform Constants
 {
 	layout(offset = 4) int U_MATERIAL_INDEX;
-};
+};*/
+
+layout(location = 1) uniform int U_MATERIAL_INDEX;
 
 layout(location = 0) out vec4 OUT_COLOR;
 

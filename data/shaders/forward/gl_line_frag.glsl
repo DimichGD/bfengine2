@@ -11,9 +11,11 @@ layout(std140, set = 0, binding = 2) uniform Colors
 	layout(offset = 4) int U_MATERIAL_INDEX;
 };*/
 
+layout(location = 1) uniform int U_MATERIAL_INDEX;
+
 layout(location = 0) out vec4 OUT_COLOR;
 
 void main()
 {
-	OUT_COLOR = U_COLORS[0];
+	OUT_COLOR = U_COLORS[U_MATERIAL_INDEX];
 }

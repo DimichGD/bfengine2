@@ -8,7 +8,7 @@ BF_BEGIN_NAMESPACE
 class PointLightRenderPath
 {
 public:
-	PointLightRenderPath(RenderDeviceGL *device, Config *config, ResourceManager *resources);
+	PointLightRenderPath(RenderDevice *device, Config *config, ResourceManager *resources);
 	BF_NON_MOVABLE(PointLightRenderPath)
 	BF_NON_COPYABLE(PointLightRenderPath)
 
@@ -18,7 +18,7 @@ public:
 
 private:
 	//RenderDeviceVK *device = nullptr;
-	RenderDeviceGL *device = nullptr;
+	RenderDevice *device = nullptr;
 	Config *config = nullptr;
 	ResourceManager *resources = nullptr;
 	GraphicsContext *context = nullptr;

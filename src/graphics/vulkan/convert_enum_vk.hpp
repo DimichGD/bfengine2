@@ -5,13 +5,14 @@
 BF_BEGIN_NAMESPACE
 BF_BEGIN_VK_NAMESPACE
 
-VkShaderStageFlags ConvertEnum(Shader::Type type);
+VkShaderStageFlagBits ConvertEnum(Shader::Type type);
 VkBufferUsageFlags ConvertEnum(GPUBuffer::Type type);
 VkFormat ConvertEnum(Vertex::Attrib attrib);
 VkPrimitiveTopology ConvertEnum(Topology topology);
 VkFormat ConvertEnum(bf::Texture::Format format);
 VkImageLayout ConvertEnum(ImageLayout layout);
 VkDescriptorType ConvertEnum(Descriptor2::Type type);
+VkCompareOp ConvertEnum(DepthFunc func);
 
 BF_END_VK_NAMESPACE
 BF_END_NAMESPACE

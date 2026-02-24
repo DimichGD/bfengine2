@@ -6,21 +6,23 @@ layout(location = 1) in vec2 IN_TEXCOORD_0;
 layout(location = 4) in vec3 IN_NORMAL;
 layout(location = 5) in vec4 IN_TANGENT;
 
-layout(std140, set = 0, binding = 0) uniform Camera
+layout(std140, binding = 0) uniform Camera
 {
 	mat4 U_PROJ_MATRIX;
 	mat4 U_VIEW_MATRIX;
 };
 
-layout(std140, set = 0, binding = 1) uniform Matrices
+layout(std140, binding = 1) uniform Matrices
 {
 	mat4 U_MODEL_MATRICES[32];
 };
 
-layout(push_constant) uniform Constants
+/*layout(push_constant) uniform Constants
 {
 	layout(offset = 0) int U_OBJECT_INDEX;
-};
+};*/
+
+layout(location = 0) uniform int U_OBJECT_INDEX;
 
 layout(location = 0) out vec2 TEXCOORD_0;
 layout(location = 2) out vec3 NORMAL;

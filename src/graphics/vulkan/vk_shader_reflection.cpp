@@ -12,36 +12,45 @@ BF_BEGIN_VK_NAMESPACE
 
 ShaderReflectionData GetShaderReflection(const std::string &name, Shader::Type type, const uint32_t *spirv, size_t word_count)
 {
-	//std::vector<Descriptor2> descriptors;
 	std::vector<Constant> constants;
+	std::array<std::vector<Descriptor2>, 4> sets;
 
 	spirv_cross::Compiler compiler(spirv, word_count);
 	spirv_cross::ShaderResources resources = compiler.get_shader_resources();
-
-	//ShaderReflectionData reflection_data {};
-	std::array<std::vector<Descriptor2>, 4> sets;
 
 	//Log() << "------------------------------------------";
 	uint32_t max_set = 0;
 
 	for (auto &resource: resources.uniform_buffers)
 	{
+		uint32_t array_size = 1;
 		uint32_t set = compiler.get_decoration(resource.id, spirv_cross::DecorationDescriptorSet);
 		uint32_t binding = compiler.get_decoration(resource.id, spirv_cross::DecorationBinding);
+
+		const spirv_cross::SPIRType &spirv_type = compiler.get_type(resource.type_id);
+		if (!spirv_type.array.empty())
+			array_size = spirv_type.array[0];
+
 		//descriptors.emplace_back(set, binding, Descriptor2::Type::UNIFORM_BUFFER, 1, type);
 		max_set = glm::max(max_set, set);
 		// TODO: assert set count
-		sets[set].emplace_back(set, binding, Descriptor2::Type::UNIFORM_BUFFER, 1, type);
+		sets[set].emplace_back(set, binding, Descriptor2::Type::UNIFORM_BUFFER, array_size);
 		//Log() << "Uniform buffer" << set << binding;
 	}
 
 	for (auto &resource: resources.storage_buffers)
 	{
+		uint32_t array_size = 1;
 		uint32_t set = compiler.get_decoration(resource.id, spirv_cross::DecorationDescriptorSet);
 		uint32_t binding = compiler.get_decoration(resource.id, spirv_cross::DecorationBinding);
+
+		const spirv_cross::SPIRType &spirv_type = compiler.get_type(resource.type_id);
+		if (!spirv_type.array.empty())
+			array_size = spirv_type.array[0];
+
 		//descriptors.emplace_back(set, binding, Descriptor2::Type::STORAGE_BUFFER, 1, type);
 		max_set = glm::max(max_set, set);
-		sets[set].emplace_back(set, binding, Descriptor2::Type::STORAGE_BUFFER, 1, type);
+		sets[set].emplace_back(set, binding, Descriptor2::Type::STORAGE_BUFFER, array_size);
 		//Log() << "Storage buffer" << set << binding;
 	}
 
@@ -51,13 +60,13 @@ ShaderReflectionData GetShaderReflection(const std::string &name, Shader::Type t
 		uint32_t set = compiler.get_decoration(resource.id, spirv_cross::DecorationDescriptorSet);
 		uint32_t binding = compiler.get_decoration(resource.id, spirv_cross::DecorationBinding);
 
-		const spirv_cross::SPIRType &spir_type = compiler.get_type(resource.type_id);
-		if (!spir_type.array.empty())
-			array_size = spir_type.array[0];
+		const spirv_cross::SPIRType &spirv_type = compiler.get_type(resource.type_id);
+		if (!spirv_type.array.empty())
+			array_size = spirv_type.array[0];
 
 		//descriptors.emplace_back(set, binding, Descriptor2::Type::TEXTURE, array_size, type);
 		max_set = glm::max(max_set, set);
-		sets[set].emplace_back(set, binding, Descriptor2::Type::TEXTURE, array_size, type);
+		sets[set].emplace_back(set, binding, Descriptor2::Type::TEXTURE, array_size);
 
 		//Log() << "Texture" << set << binding << array_size;
 	}
@@ -66,7 +75,12 @@ ShaderReflectionData GetShaderReflection(const std::string &name, Shader::Type t
 	{
 		for (auto &range: compiler.get_active_buffer_ranges(resource.id))
 		{
-			constants.emplace_back(range.offset, range.range, Constant::Type::INT);
+			const spirv_cross::SPIRType &spirv_type = compiler.get_type(resource.type_id);
+			Constant::Type type = Constant::Type::INT;
+			if (spirv_type.basetype == spirv_cross::SPIRType::BaseType::Float)
+				type = Constant::Type::FLOAT;
+
+			constants.emplace_back(range.offset, range.range, type);
 		}
 
 		/*spirv_cross::SPIRType type = compiler.get_type(resource.base_type_id);
@@ -88,7 +102,7 @@ ShaderReflectionData GetShaderReflection(const std::string &name, Shader::Type t
 		}*/
 	}
 
-	return { name, std::move(constants), max_set, type, std::move(sets) };
+	return { name, max_set, type, std::move(constants), std::move(sets) };
 }
 
 std::vector<uint32_t> CompileShader(const std::string &name, const std::vector<char> &source)
@@ -153,19 +167,32 @@ VkPipelineLayout CreatePipelineLayout(VkDevice device,
 	std::map<Descriptor2::Type, std::string> type_name
 	{
 		{ Descriptor2::Type::UNIFORM_BUFFER, "UNIFORM_BUFFER" },
+		{ Descriptor2::Type::STORAGE_BUFFER, "STORAGE_BUFFER" },
 		{ Descriptor2::Type::TEXTURE, "TEXTURE" },
 	};
 
-	std::map<Shader::Type, std::string> stage_name
+	std::map<VkShaderStageFlagBits, std::string> stage_name
 	{
-		{ Shader::Type::VERTEX, "VERTEX" },
-		{ Shader::Type::FRAGMENT, "FRAGMENT" },
-		{ Shader::Type::VERTEX_FRAGMENT, "VERTEX_FRAGMENT" }
+		{ VK_SHADER_STAGE_VERTEX_BIT, "VERTEX" },
+		{ VK_SHADER_STAGE_FRAGMENT_BIT, "FRAGMENT" },
 	};
 
 	// merge reflection data
 
-	std::array<std::vector<Descriptor2>, 4> combined_descriptors;
+	struct StageDescriptor
+	{
+		Descriptor2 descriptor;
+		VkShaderStageFlags stage_flags = 0;
+	};
+
+	/*struct StageConstant
+	{
+		Constant constant;
+		VkShaderStageFlags stage_flags = 0;
+	};*/
+
+	std::array<std::vector<StageDescriptor>, 4> combined_descriptors;
+	//std::vector<StageConstant> combined_constants;
 
 	for (const ShaderReflectionData *data: reflection_data)
 	{
@@ -174,15 +201,27 @@ VkPipelineLayout CreatePipelineLayout(VkDevice device,
 			for (auto &desc: data->sets[i])
 			{
 				auto it = std::find_if(combined_descriptors[i].begin(), combined_descriptors[i].end(),
-									   [&desc](const Descriptor2 &other){ return other.CompareWithoutStage(desc); });
+									   [&desc](const StageDescriptor &other){ return other.descriptor == desc; });
 
 				if (it != combined_descriptors[i].end())
-					it->stage = Shader::Type(uint8_t(it->stage) | uint8_t(desc.stage));
+					it->stage_flags |= vk::ConvertEnum(data->stage);
 
 				else
-					combined_descriptors[i].push_back(desc);
+					combined_descriptors[i].push_back({ desc, vk::ConvertEnum(data->stage) });
 			}
 		}
+
+		/*for (auto &constant: data->constants)
+		{
+			auto it = std::find_if(combined_constants.begin(), combined_constants.end(),
+								   [&constant](const StageConstant &other){ return other.constant == constant; });
+
+			if (it != combined_constants.end())
+				it->stage_flags |= vk::ConvertEnum(data->stage);
+
+			else
+				combined_constants.push_back({ constant, vk::ConvertEnum(data->stage) });
+		}*/
 	}
 
 	// sort descriptors by binding
@@ -193,7 +232,7 @@ VkPipelineLayout CreatePipelineLayout(VkDevice device,
 			continue;
 
 		std::sort(descriptors.begin(), descriptors.end(),
-				  [](const Descriptor2 &a, const Descriptor2 &b){ return a.binding < b.binding; });
+				  [](const StageDescriptor &a, const StageDescriptor &b){ return a.descriptor.binding < b.descriptor.binding; });
 	}
 
 	// create set layout
@@ -212,16 +251,18 @@ VkPipelineLayout CreatePipelineLayout(VkDevice device,
 		{
 			VkDescriptorSetLayoutBinding binding
 			{
-				.binding = desc.binding,
-				.descriptorType = vk::ConvertEnum(desc.type),
-				.descriptorCount = desc.array_size,
-				.stageFlags = vk::ConvertEnum(desc.stage),
+				.binding = desc.descriptor.binding,
+				.descriptorType = vk::ConvertEnum(desc.descriptor.type),
+				.descriptorCount = desc.descriptor.array_size,
+				.stageFlags = desc.stage_flags,
 				.pImmutableSamplers = nullptr,
 			};
 
 			bindigns.push_back(binding);
-			set_hash = hash(set_hash, desc.Hash());
-			//Log() << uint32_t(desc.set) << uint32_t(desc.binding) << type_name[desc.type] << stage_name[desc.stage];
+			set_hash = hash(set_hash, desc.descriptor.Hash());
+			set_hash = hash(set_hash, desc.stage_flags);
+			//Log() << uint32_t(desc.descriptor.set) << uint32_t(desc.descriptor.binding)
+			//	  << type_name[desc.descriptor.type] << desc.stage_flags;
 		}
 
 		if (set_hash == 0)
@@ -266,6 +307,23 @@ VkPipelineLayout CreatePipelineLayout(VkDevice device,
 		decriptor_set_layouts.push_back(decriptor_set_layout);
 		global_descriptor_set_layouts[set_hash] = decriptor_set_layout;
 	}
+
+	// push constant ranges
+
+	/*std::vector<VkPushConstantRange> push_constant_ranges;
+	push_constant_ranges.reserve(combined_constants.size());
+
+	for (auto &constant: combined_constants)
+	{
+		VkPushConstantRange range
+		{
+			.stageFlags = constant.stage_flags,
+			.offset = constant.constant.offset,
+			.size = constant.constant.size,
+		};
+
+		push_constant_ranges.push_back(range);
+	}*/
 
 	// create pipeline layout
 

@@ -1,9 +1,9 @@
 #version 460 core
 #pragma shader_stage(fragment)
 
-layout(set = 1, binding = 0) uniform sampler2D diffuse_map;
-layout(set = 1, binding = 1) uniform sampler2D normal_map;
-layout(set = 1, binding = 2) uniform sampler2D specular_map;
+layout(binding = 0) uniform sampler2D diffuse_map;
+layout(binding = 1) uniform sampler2D normal_map;
+layout(binding = 2) uniform sampler2D specular_map;
 
 layout(location = 0) in vec2 TEXCOORD_0;
 layout(location = 2) in vec3 NORMAL;

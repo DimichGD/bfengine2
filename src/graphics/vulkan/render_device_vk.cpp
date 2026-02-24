@@ -475,7 +475,7 @@ PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const Pipelin
 	//builder.CreateFragmentOutputStage(desc.raster);
 
 	for (const Shader &shader: desc.shaders)
-		builder.AppendShader(VkShaderStageFlagBits(vk::ConvertEnum(shader.type)), store->shader_modules[shader.handle]);
+		builder.AppendShader(vk::ConvertEnum(shader.type), store->shader_modules[shader.handle]);
 
 	pipeline.pipeline = builder.Build(vk->device, VK_NULL_HANDLE); // TODO: measure pipeline cache speedup if any
 	if (pipeline.pipeline == VK_NULL_HANDLE)
@@ -933,7 +933,7 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 	vk_texture->layout = vk::ConvertEnum(to);
 }
 
-GPUBuffer RenderDeviceVK::CreateBuffer(GPUBuffer::Type type, uint32_t size)
+GPUBuffer RenderDeviceVK::CreateBuffer(GPUBuffer::Type type, uint32_t size, const void *data) // TODO: handle data pointer
 {
 	assert(size > 0);
 
@@ -986,11 +986,19 @@ GPUBuffer RenderDeviceVK::CreateBuffer(GPUBuffer::Type type, uint32_t size)
 		throw;
 	}
 
+	store->buffers.push_back({ buffer, device_memory });
+	GPUBuffer gpu_buffer = { { uint32_t(store->buffers.size() - 1) }, uint32_t(size), type };
+
+	if (data)
+		UpdateBuffer(gpu_buffer, size, data, 0);
+
+	return gpu_buffer;
+
 	//if (size != memory_req.size)
 	//	Log() << "Size mismatch" << size << memory_req.size;
 
-	store->buffers.push_back({ buffer, device_memory });
-	return { { uint32_t(store->buffers.size() - 1) }, uint32_t(size), type };
+	//store->buffers.push_back({ buffer, device_memory });
+	//return { { uint32_t(store->buffers.size() - 1) }, uint32_t(size), type };
 }
 
 void RenderDeviceVK::UpdateBuffer(GPUBuffer buffer, uint32_t size, const void *data, uint32_t offset)
@@ -1117,10 +1125,10 @@ void RenderDeviceVK::WriteDescriptor(DescriptorSet set, uint32_t binding, Textur
 }
 
 
-void RenderDeviceVK::BindDescriptorSet(Descriptor2::Set set, DescriptorSet index)
+void RenderDeviceVK::BindDescriptorSet(Descriptor2::Set index, DescriptorSet descriptor_set)
 {
 	vkCmdBindDescriptorSets(vk->current_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-					store->current_pipeline.layout, uint32_t(set), 1, &store->descriptor_sets.at(index.handle), 0, nullptr);
+					store->current_pipeline.layout, uint32_t(index), 1, &store->descriptor_sets.at(descriptor_set.handle), 0, nullptr);
 }
 
 /*void RenderDeviceVK::Push(Shader::Type type, uint32_t offset, glm::vec4 value)

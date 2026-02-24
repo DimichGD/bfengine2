@@ -50,8 +50,9 @@ RenderDeviceGL::~RenderDeviceGL()
 	//
 }
 
-void RenderDeviceGL::Create(SDL_Window *window_handle)
+bool RenderDeviceGL::Create(SDL_Window *window_handle)
 {
+	(void)window_handle;
 	gl_load_functions();
 
 	glEnable(GL_DEBUG_OUTPUT);
@@ -75,7 +76,11 @@ void RenderDeviceGL::Create(SDL_Window *window_handle)
 	glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // GL_LINEAR_MIPMAP_LINEAR
 	glBindSampler(0, sampler);
 
-	//glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
+	glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+	glFrontFace(GL_CCW);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+	return true;
 }
 
 void RenderDeviceGL::Destroy()
@@ -89,10 +94,21 @@ void RenderDeviceGL::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 	//glClearDepth(clear_flags.depth);
 
 	if (framebuffer_id)
+	{
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_id.handle);
-
+	}
 	else
+	{
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glEnable(GL_FRAMEBUFFER_SRGB);
+	}
+
+	if (clear_flags == RenderPass::Clear::DEPTH || clear_flags == RenderPass::Clear::COLOR_DEPTH)
+		glDepthMask(GL_TRUE); // FIXME: depth mask affects glClear
+
+	/*From https://www.reddit.com/r/opengl/comments/1pxzzt/framebuffer_object_attached_depth_buffer_is_not/:
+		You should set your depth function before clear and then never change it.
+		Violating this disables early-Z and hierarchical-Z optimizations which can drastically reduce performance. */
 
 	//glViewport(framebuffer_id[0], framebuffer_id[1], framebuffer_id[2], framebuffer_id[3]);
 	glViewport(0, 0, config->window.width, config->window.height);
@@ -101,7 +117,8 @@ void RenderDeviceGL::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 
 void RenderDeviceGL::EndRenderPass(FramebufferID framebuffer_id)
 {
-	//
+	if (!framebuffer_id)
+		glDisable(GL_FRAMEBUFFER_SRGB);
 }
 
 PipelineID RenderDeviceGL::CreatePipeline(const std::string &name, const PipelineDesc &desc)
@@ -126,6 +143,10 @@ void RenderDeviceGL::BindPipeline(PipelineID pipeline_id)
 	//glVertexArrayElementBuffer(pipeline.vao.handle, 0);
 
 	current_pipeline.raster.depth_test ? glEnable(GL_DEPTH_TEST) : glDisable(GL_DEPTH_TEST);
+	current_pipeline.raster.depth_write ? glDepthMask(GL_TRUE) : glDepthMask(GL_FALSE);
+
+	if (current_pipeline.raster.depth_test)
+		glDepthFunc(gl::ConvertEnum(current_pipeline.raster.depth_func));
 
 	switch (current_pipeline.raster.blend)
 	{
@@ -171,6 +192,7 @@ void RenderDeviceGL::SetCullMode(uint32_t mode)
 	if (mode == 0)
 	{
 		glDisable(GL_CULL_FACE);
+		return;
 	}
 
 	GLenum cull_mode = GL_BACK;
@@ -230,10 +252,10 @@ void RenderDeviceGL::BindDescriptorSet(Descriptor2::Set index, DescriptorSet des
 void RenderDeviceGL::Push(Shader::Type type, uint32_t offset, int value)
 {
 	if (offset == 0)
-		glUniform1i(-1, value);
+		glUniform1i(0, value);
 
 	else if (offset == 4)
-		glUniform1i(-1, value);
+		glUniform1i(1, value);
 }
 
 FramebufferID RenderDeviceGL::CreateFramebuffer(const FramebufferDesc &desc)
@@ -241,43 +263,23 @@ FramebufferID RenderDeviceGL::CreateFramebuffer(const FramebufferDesc &desc)
 	uint32_t fbo;
 	glGenFramebuffers(1, &fbo);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	std::vector<GLenum> draw_buffers(desc.color_textures.size());
+	//draw_buffers[fbo].reserve(desc.color_textures.size());
+
 	for (size_t i = 0; i < desc.color_textures.size(); i++)
+	{
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, desc.color_textures[i].handle, 0);
+		draw_buffers[i] = GL_COLOR_ATTACHMENT0 + i;
+	}
 
 	if (desc.depth_texture)
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, desc.depth_texture.handle, 0);
 
+	glDrawBuffers(draw_buffers.size(), draw_buffers.data());
+
 	return { fbo };
 }
 
-Shader RenderDeviceGL::CreateShader(Shader::Type type, const std::vector<char> &source)
-{
-	GLint length[] = { static_cast<GLint>(glsl_version.length()),
-					   static_cast<GLint>(glsl_defines.size()),
-					   static_cast<GLint>(source.size()) };
-	GLchar const *strings[] = { glsl_version.data(), glsl_defines.data(), source.data() };
-
-	GLuint shader = glCreateShader(gl::ConvertEnum(type));
-	glShaderSource(shader, 3, strings, length);
-	glCompileShader(shader);
-
-	GLint status = 0;
-	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-	if (status != GL_TRUE)
-	{
-		GLint len;
-		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
-
-		std::string log(len, '\0');
-		glGetShaderInfoLog(shader, len, nullptr, log.data());
-
-		Log() << "Shader compilation failed";
-		Log() << log;
-		return {};
-	}
-
-	return Shader(shader, type);
-}
 
 Shader RenderDeviceGL::LoadShader(Shader::Type type, const std::string &name)
 {
@@ -320,31 +322,6 @@ Shader RenderDeviceGL::LoadShader(Shader::Type type, const std::string &name)
 	}
 
 	return Shader(shader, type);
-}
-
-void RenderDeviceGL::SetUniform(Uniform::Name name, int value)
-{
-	glUniform1i(std::to_underlying(name), value);
-}
-
-void RenderDeviceGL::SetUniform(Uniform::Name name, const glm::mat4 &value)
-{
-	glUniformMatrix4fv(std::to_underlying(name), 1, GL_FALSE, glm::value_ptr(value));
-}
-
-void RenderDeviceGL::SetUniform(Uniform::Name name, const glm::vec4 &value)
-{
-	glUniform4fv(std::to_underlying(name), 1, glm::value_ptr(value));
-}
-
-void RenderDeviceGL::SetUniform(Uniform::Texture name, const Texture &value)
-{
-	glBindTextureUnit(std::to_underlying(name), value.handle);
-}
-
-void RenderDeviceGL::SetUniform(Uniform::Buffer name, const GPUBuffer &value)
-{
-	glBindBufferBase(gl::ConvertEnum(value.type), std::to_underlying(name), value.handle);
 }
 
 /*void RenderDevice::WriteUniform(const Uniform &uniform)
@@ -461,6 +438,11 @@ void RenderDeviceGL::Draw(const std::vector<DrawCommand> &commands)
 
 void RenderDeviceGL::Draw(uint32_t first, uint32_t count)
 {
+	/*int value = 0;
+	glGetIntegerv(GL_BLEND, &value);
+	if (value == 1)
+		std::terminate();*/
+
 	glDrawArrays(current_pipeline.topology, first, count);
 }
 
@@ -472,29 +454,6 @@ void RenderDeviceGL::DrawIndexed(uint32_t first, uint32_t count)
 	glDrawElementsInstancedBaseInstance(current_pipeline.topology, count, GL_UNSIGNED_INT, offset, 1, 0);
 }
 
-void RenderDeviceGL::BindDescriptors(size_t index, size_t count)
-{
-	for (size_t i = index; i < index + count; i++)
-	{
-		Descriptor &descriptor = descriptors.at(i);
-		switch (descriptor.value.index())
-		{
-			case 0:
-			{
-				Texture &texture = std::get<0>(descriptor.value);
-				glBindTextureUnit(descriptor.location, texture.handle);
-				break;
-			}
-
-			case 1:
-			{
-				glm::vec4 &value = std::get<1>(descriptor.value);
-				glUniform4fv(descriptor.location, 1, glm::value_ptr(value));
-				break;
-			}
-		}
-	}
-}
 
 Program RenderDeviceGL::CreateProgram(const std::vector<Shader> &shaders)
 {
@@ -517,7 +476,14 @@ Program RenderDeviceGL::CreateProgram(const std::vector<Shader> &shaders)
 	glGetProgramiv(prog, GL_LINK_STATUS, &status);
 	if (status != GL_TRUE)
 	{
-		Log() << "Program link failed";
+		GLint len;
+		glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &len);
+
+		std::string log(len, '\0');
+		glGetProgramInfoLog(prog, len, nullptr, log.data());
+
+		Error() << /*name <<*/ "Program link failed";
+		Error() << log;
 		return {};
 	}
 

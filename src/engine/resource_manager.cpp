@@ -28,29 +28,6 @@ ResourceManager::ResourceManager(RenderDevice *device, FileSystem *fs)
 	materials[material_name] = std::make_shared<Material>(tex_d);
 }
 
-ResourceManager::ResourceManager(RenderDeviceVK *device, FileSystem *fs)
-{
-	this->device2 = device;
-	this->fs = fs;
-
-	// set paths for all directories to eliminate allocations?
-
-	std::string material_name = "wall/gotbwall4";
-	Texture tex_d = LoadTexture(material_name + "_d.png");
-	Texture tex_n = LoadTexture(material_name + "_local.png");
-	Texture tex_s = LoadTexture(material_name + "_s.png");
-	materials[material_name] = std::make_shared<PhongMaterial>(tex_d, tex_n, tex_s);
-
-	material_name = "floor/diafloor";
-	tex_d = LoadTexture(material_name + "_d.png");
-	tex_n = LoadTexture(material_name + "_local.png");
-	tex_s = LoadTexture(material_name + "_s.png");
-	materials[material_name] = std::make_shared<PhongMaterial>(tex_d, tex_n, tex_s);
-
-	material_name = "red.png";
-	tex_d = LoadTexture(material_name);
-	materials[material_name] = std::make_shared<Material>(tex_d);
-}
 
 ResourceManager::~ResourceManager()
 {
@@ -112,7 +89,7 @@ Texture ResourceManager::LoadTexture(std::string_view filename)
 		.generate_mipmaps = false,
 	};
 
-	Texture result = device ? device->CreateTexture(std::string(filename), desc) : device2->CreateTexture(std::string(filename), desc);
+	Texture result = device->CreateTexture(std::string(filename), desc);
 	//device2->SetDebugName(result, std::string(filename).c_str());
 	SDL_DestroySurface(surf);
 
@@ -182,7 +159,7 @@ Mesh ResourceManager::LoadMesh(std::string_view filename)
 	std::vector<char> verts(vertex_count * vertex_stride);
 	mesh_file.Read(verts.data(), vertex_count * vertex_stride);
 
-	GPUBuffer cubes_vbo = device ? device->CreateBuffer(GPUBuffer::VERTEX, verts) : device2->CreateBuffer(GPUBuffer::VERTEX, verts);
+	GPUBuffer cubes_vbo = device->CreateBuffer(GPUBuffer::VERTEX, verts);
 	return { .surfaces = surfaces, .vbo = cubes_vbo, .matrix_index = 0 };
 }
 

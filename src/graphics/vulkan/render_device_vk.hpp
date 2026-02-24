@@ -13,7 +13,7 @@ struct TrackedResource
 	//ImageLayout next = ImageLayout::UNDEFINED;
 };
 
-class RenderDeviceVK /*: public RenderDevice*/
+class RenderDeviceVK: public RenderDevice
 {
 public:
 	RenderDeviceVK(Config *config, FileSystem *fs);
@@ -21,30 +21,31 @@ public:
 	BF_NON_COPYABLE(RenderDeviceVK)
 	BF_NON_MOVABLE(RenderDeviceVK)
 
-	bool Create(SDL_Window *window_handle);
-	void Destroy();
+	bool Create(SDL_Window *window_handle) override;
+	void Destroy() override;
 
 	//Shader CreateShader(const std::string &name, Shader::Type type, const std::vector<char> &source);
-	Shader LoadShader(Shader::Type type, const std::string &name);
-	PipelineID CreatePipeline(const std::string &name, const PipelineDesc &desc);
+	Shader LoadShader(Shader::Type type, const std::string &name) override;
+	PipelineID CreatePipeline(const std::string &name, const PipelineDesc &desc) override;
 	void Test();
 	//void CreatePipelineLayout(const std::map<Descriptor::Set, std::vector<Descriptor>> &descriptors);
 	//void CreatePipelineLayout(const PipelineLayout &layout);
-	void BindPipeline(PipelineID pipeline);
-	void Draw(uint32_t first, uint32_t count);
+	void BindPipeline(PipelineID pipeline) override;
+	void Draw(uint32_t first, uint32_t count) override;
+	void DrawIndexed(uint32_t first, uint32_t count) override {}
 
-	void BeginFrame();
-	void BeginRenderPass(FramebufferID framebuffer_id, RenderPass::Clear clear_flags);
+	void BeginFrame() override;
+	void BeginRenderPass(FramebufferID framebuffer_id, RenderPass::Clear clear_flags) override;
 	void SetViewport(glm::ivec4 viewport);
-	void SetCullMode(uint32_t mode);
-	void EndRenderPass(FramebufferID framebuffer_id);
-	void EndFrame();
-	void LayoutTransition(Texture texture, ImageLayout from, ImageLayout to);
+	void SetCullMode(uint32_t mode) override;
+	void EndRenderPass(FramebufferID framebuffer_id) override;
+	void EndFrame() override;
+	void LayoutTransition(Texture texture, ImageLayout from, ImageLayout to) override;
 
-	GPUBuffer CreateBuffer(GPUBuffer::Type type, uint32_t size);
-	void UpdateBuffer(GPUBuffer buffer, uint32_t size, const void *data, uint32_t offset);
-	void *MapBuffer(GPUBuffer buffer);
-	void UnMapBuffer(GPUBuffer buffer);
+	GPUBuffer CreateBuffer(GPUBuffer::Type type, uint32_t size, const void *data = nullptr) override;
+	void UpdateBuffer(GPUBuffer buffer, uint32_t size, const void *data, uint32_t offset) override;
+	void *MapBuffer(GPUBuffer buffer) override;
+	void UnMapBuffer(GPUBuffer buffer) override;
 
 	template<typename T>
 	GPUBuffer CreateBuffer(GPUBuffer::Type type, const std::vector<T> &data)
@@ -61,20 +62,21 @@ public:
 		return { t, size_t(buffer.size / sizeof(T)) };
 	}
 
-	void BindVertexBuffer(GPUBuffer buffer);
+	void BindVertexBuffer(GPUBuffer buffer) override;
+	void BindIndexBuffer(GPUBuffer buffer) override {}
 
-	DescriptorSet CreateDescriptorSet(PipelineID pipeline, Descriptor2::Set set);
-	void WriteDescriptor(DescriptorSet set, uint32_t binding, GPUBuffer value);
-	void WriteDescriptor(DescriptorSet set, uint32_t binding, Texture value, uint32_t index = 0);
-	void BindDescriptorSet(Descriptor2::Set set, DescriptorSet index); // TODO: rename index
+	DescriptorSet CreateDescriptorSet(PipelineID pipeline, Descriptor2::Set set) override;
+	void WriteDescriptor(DescriptorSet set, uint32_t binding, GPUBuffer value) override;
+	void WriteDescriptor(DescriptorSet set, uint32_t binding, Texture value, uint32_t index = 0) override;
+	void BindDescriptorSet(Descriptor2::Set index, DescriptorSet descriptor_set) override; // TODO: rename index
 	//void Push(Shader::Type type, uint32_t offset, glm::vec4 value);
-	void Push(Shader::Type type, uint32_t offset, int value);
+	void Push(Shader::Type type, uint32_t offset, int value) override;
 	//void Push(size_t size, size_t offset, void *value);
 	/*void SetUniform1i(int value);
 	void SetUniform2i(std::array<int, 2> values);*/
 
-	Texture CreateTexture(const std::string &name, const TextureDesc &desc);
-	FramebufferID CreateFramebuffer(const FramebufferDesc &desc);
+	Texture CreateTexture(const std::string &name, const TextureDesc &desc) override;
+	FramebufferID CreateFramebuffer(const FramebufferDesc &desc) override;
 	Framebuffer GetFramebuffer(FramebufferID framebuffer);
 	//Texture GetDepthTexture();
 	//void SetDepthTexture(Texture depth_texture);
@@ -94,6 +96,8 @@ private:
 	//std::map<Handle, TrackedResource> tracked_resources;
 	//std::vector<ImageLayout> swapchain_image_prev_layouts;
 	//std::vector<Texture> swapchain_textures;
+
+	// RenderDevice interface
 };
 
 BF_END_NAMESPACE

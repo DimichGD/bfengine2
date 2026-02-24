@@ -8,7 +8,7 @@ BF_BEGIN_NAMESPACE
 class Deferred
 {
 public:
-	Deferred(RenderDeviceGL *device, Config *config, ResourceManager *resources);
+	Deferred(RenderDevice *device, Config *config, ResourceManager *resources);
 	BF_NON_MOVABLE(Deferred)
 	BF_NON_COPYABLE(Deferred)
 
@@ -33,7 +33,7 @@ public:
 
 //private:
 	//RenderDeviceVK *device = nullptr;
-	RenderDeviceGL *device = nullptr;
+	RenderDevice *device = nullptr;
 	Config *config = nullptr;
 	ResourceManager *resources = nullptr;
 	GraphicsContext *context = nullptr;

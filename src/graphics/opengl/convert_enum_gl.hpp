@@ -17,6 +17,7 @@ GLenum ConvertEnum(Shader::Type value);
 GLenum ConvertEnum(RenderPass::Clear value);
 GLenum ConvertEnum(Topology value);
 TextureFormat ConvertEnum(bf::Texture::Format value);
+GLenum ConvertEnum(DepthFunc func);
 
 BF_END_GL_NAMESPACE
 BF_END_NAMESPACE

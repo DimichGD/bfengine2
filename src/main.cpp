@@ -37,7 +37,7 @@ int main()
 	Log::Init(Log::Destination::STDOUT, Log::Level::WARN);
 	Config config;
 	config.window.swap_interval = 1;
-	config.render.api = Config::Render::API::GL;
+	config.render.api = Config::Render::API::VK;
 	if (!config.Load())
 		config.Save();
 
@@ -52,7 +52,13 @@ int main()
 	const char *flip_shader_name = config.render.api == Config::Render::API::VK ? "vk_flip" : "gl_flip";
 	const char *ui_texture_shader_name = config.render.api == Config::Render::API::VK ? "ui/vk_texture" : "ui/gl_texture";
 
-	RenderDevice *device = new RenderDeviceGL(&config, &fs);
+	RenderDevice *device = nullptr;
+	switch (config.render.api)
+	{
+		case Config::Render::API::VK: device = new RenderDeviceVK(&config, &fs); break;
+		case Config::Render::API::GL: device = new RenderDeviceGL(&config, &fs); break;
+	}
+
 	device->Create(wnd.WindowHandle());
 
 	ResourceManager resources(device, &fs);
@@ -138,8 +144,16 @@ int main()
 		.framebuffer_id = {},
 	};
 
+	glm::mat4 ortho;
+	switch (config.render.api)
+	{
+		case Config::Render::API::VK: ortho = glm::ortho(0.0f, float(config.window.width), 0.0f, float(config.window.height)); break;
+		case Config::Render::API::GL: ortho = glm::ortho(0.0f, float(config.window.width), float(config.window.height), 0.0f); break;
+	}
+
 	//glm::mat4 ortho = glm::ortho(0.0f, float(config.window.width), 0.0f, float(config.window.height));
-	glm::mat4 ortho = glm::ortho(0.0f, float(config.window.width), float(config.window.height), 0.0f);
+	//glm::mat4 ortho = glm::ortho(0.0f, float(config.window.width), float(config.window.height), 0.0f);
+	//ortho = glm::ortho(0.0f, float(config.window.width), 0.0f, float(config.window.height));
 	GPUBuffer ortho_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4));
 	device->UpdateBuffer(ortho_ubo, sizeof(glm::mat4), glm::value_ptr(ortho), 0);
 
@@ -193,14 +207,15 @@ int main()
 	view_transform.pos = glm::vec3(5.0f, 4.0f, 10.0f);
 	view_transform.rot = glm::quat(glm::vec3(glm::radians(-30.0f), glm::radians(30.0f), 0.0f));
 	//glm::mat4 proj = glm::perspectiveFovZO(glm::radians(80.0f), float(width), float(height), 0.1f, 100.0f);
-	glm::mat4 proj = glm::perspectiveFovNO(glm::radians(80.0f), float(width), float(height), 0.1f, 100.0f);
-	proj[1][1] *= -1;
+	glm::mat4 proj = glm::perspectiveFovZO(glm::radians(80.0f), float(width), float(height), 0.1f, 100.0f);
+	if (config.render.api == Config::Render::API::VK)
+		proj[1][1] *= -1;
 
 	GPUBuffer camera_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4) * 2);
 	device->UpdateBuffer(camera_ubo, sizeof(glm::mat4), glm::value_ptr(proj), 0);
 
 	std::vector<glm::mat4> matrices(32, glm::mat4(1.0f));
-	matrices[1] = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -4.05f, 0.0f));
+	matrices[1] = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -4.03f, 0.0f)); // TODO: depth bias
 	GPUBuffer matrices_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, matrices);
 
 
@@ -240,11 +255,11 @@ int main()
 		.point_lights_ubo = point_lights_ubo,
 		.camera_pos_ubo = camera_pos_ubo,
 	};
-	/*Deferred deferred(&device2, &config, &resources);
+	Deferred deferred(device, &config, &resources);
 	deferred.Create(&graphics_context, gbuffer);
 
-	PointLightRenderPath point_light_rp(&device2, &config, &resources);
-	point_light_rp.Create(&graphics_context, gbuffer_textures, gbuffer_depth, final_fbo);*/
+	PointLightRenderPath point_light_rp(device, &config, &resources);
+	point_light_rp.Create(&graphics_context, gbuffer_textures, gbuffer_depth, final_fbo);
 
 	Debug debug(device, &config, &resources);
 	debug.Create(&graphics_context, final_fbo);
@@ -293,8 +308,8 @@ int main()
 	//walls.push_back(MakeWall({{ { -8.0f, -4.0f, 8.0f, }, { -8.0f, -4.0f, -8.0f, } }}));
 	//device->UpdateBuffer(editing_vbo, sizeof(NormalMappedVertex) * 6 * walls.size(), walls.data(), 0);
 	// next 2 lines is working
-	//Surface wall_surf { { 0, 6 * uint32_t(walls.size()) }, resources.LoadMaterial("wall/gotbwall4"), 0, device->CreateDescriptorSet(deferred.pipeline, Descriptor2::Set::MATERIAL) };
-	//wall_surf.material->Setup(&device2, wall_surf.descriptor_set);
+	Surface wall_surf { { 0, 6 * uint32_t(walls.size()) }, resources.LoadMaterial("wall/gotbwall4"), 0, device->CreateDescriptorSet(deferred.pipeline, Descriptor2::Set::MATERIAL) };
+	wall_surf.material->Setup(device, wall_surf.descriptor_set);
 
 	uint32_t editing_wall_index = 0;
 
@@ -323,7 +338,7 @@ int main()
 				// begin draw
 				pos[0] = pos[1] = sphere_pos;
 				walls.push_back({});
-				//wall_surf.vertex_range.count = walls.size() * 6;
+				wall_surf.vertex_range.count = walls.size() * 6;
 
 				editing_mode = EditingMode::DRAW;
 			}
@@ -340,7 +355,13 @@ int main()
 		if (editing_mode == EditingMode::DRAW)
 		{
 			pos[1] = sphere_pos;
-			walls[editing_wall_index] = MakeWall({{ pos[0], pos[1] }});
+
+			if (glm::dot(pos[1] - pos[0], view_transform.rot * glm::vec3(1.0f, 0.0f, 0.0f)) < 0)
+				walls[editing_wall_index] = MakeWall({{ pos[1], pos[0] }});
+
+			else
+				walls[editing_wall_index] = MakeWall({{ pos[0], pos[1] }});
+
 			device->UpdateBuffer(editing_vbo, sizeof(NormalMappedVertex) * 6 * walls.size(), walls.data(), 0);
 		}
 
@@ -362,7 +383,7 @@ int main()
 
 		float dx = (input.KeyPressed(KEY_MOVE_RIGHT) - input.KeyPressed(KEY_MOVE_LEFT)) * move_speed * speed_modifier * dt;
 		float dy = (input.KeyPressed(KEY_MOVE_UP) - input.KeyPressed(KEY_MOVE_DOWN)) * move_speed * dt;
-		float dz = (input.KeyPressed(KEY_MOVE_BACKWARD) - input.KeyPressed(KEY_MOVE_FORWARD)) * move_speed * speed_modifier * dt;
+		float dz = (input.KeyPressed(KEY_MOVE_FORWARD) - input.KeyPressed(KEY_MOVE_BACKWARD)) * move_speed * speed_modifier * dt;
 		float yaw = input.MouseRelativePos().x * turn_speed * dt;
 		float pitch = input.MouseRelativePos().y * turn_speed * dt;
 
@@ -381,7 +402,7 @@ int main()
 			view_transform.rot = qx * view_transform.rot * qy;
 		}
 		view_transform.pos += view_transform.rot * glm::vec3(1.0f, 0.0f, 0.0f) * dx;
-		view_transform.pos += view_transform.rot * glm::vec3(0.0f, 0.0f, 1.0f) * dz;
+		view_transform.pos += view_transform.rot * glm::vec3(0.0f, 0.0f, -1.0f) * dz;
 		view_transform.pos += glm::vec3(0.0f, dy, 0.0f);
 		input.Flush();
 
@@ -413,8 +434,8 @@ int main()
 		}
 		else
 		{
-			//glm::vec3 win_coords = glm::vec3(input.MousePos().x, height - input.MousePos().y, 1.0f); // OpenGL
-			glm::vec3 win_coords = glm::vec3(input.MousePos().x, input.MousePos().y, 1.0f); // Vulkan
+			glm::vec3 win_coords = glm::vec3(input.MousePos().x, height - input.MousePos().y, 1.0f); // OpenGL
+			//glm::vec3 win_coords = glm::vec3(input.MousePos().x, input.MousePos().y, 1.0f); // Vulkan
 			glm::vec4 viewport = glm::vec4(0.0f, 0.0f, width, height);
 			glm::vec3 result = glm::unProject(win_coords, view, proj, viewport);
 			dir = glm::normalize(result - view_transform.pos);
@@ -439,7 +460,7 @@ int main()
 		start_time = SDL_GetTicks();
 		device->BeginFrame();
 
-		device->SetCullMode(0); // 2
+		device->SetCullMode(2); // 2
 
 		device->LayoutTransition(gbuffer_textures[0], ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
 		device->LayoutTransition(gbuffer_textures[1], ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
@@ -448,15 +469,15 @@ int main()
 		device->LayoutTransition(flip_texture, ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
 		device->LayoutTransition({}, ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
 
-		/*device->BeginRenderPass(gbuffer, RenderPass::Clear::COLOR_DEPTH);
-		//deferred.Render(meshes);
-		device->BindPipeline(deferred.pipeline);
+		device->BeginRenderPass(gbuffer, RenderPass::Clear::COLOR_DEPTH);
+		deferred.Render(meshes);
+		/*device->BindPipeline(deferred.pipeline);
 		device->BindDescriptorSet(Descriptor2::Set::SCENE, deferred.scene_set);
-		device->Push(Shader::Type::VERTEX, 0, 0);
+		device->Push(Shader::Type::VERTEX, 0, 0);*/
 
-		//
 		device->BindVertexBuffer(editing_vbo);
 		device->BindDescriptorSet(Descriptor2::Set::MATERIAL, wall_surf.descriptor_set);
+		device->Push(Shader::Type::VERTEX, 0, 0);
 		device->Draw(wall_surf.vertex_range.start, wall_surf.vertex_range.count);
 
 		device->EndRenderPass(gbuffer);
@@ -464,21 +485,23 @@ int main()
 		device->LayoutTransition(gbuffer_textures[0], ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
 		device->LayoutTransition(gbuffer_textures[1], ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
 		device->LayoutTransition(gbuffer_textures[2], ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
-		device->LayoutTransition(gbuffer_depth, ImageLayout::DEPTH_STENCIL_ATTACHMENT, ImageLayout::DEPTH_STENCIL_READ_ONLY);*/
+		device->LayoutTransition(gbuffer_depth, ImageLayout::DEPTH_STENCIL_ATTACHMENT, ImageLayout::DEPTH_STENCIL_READ_ONLY);
 
 		device->BeginRenderPass(final_fbo, RenderPass::Clear::COLOR);
-		/*device->SetCullMode(1);
+		device->SetCullMode(1);
 		point_light_rp.Render();
-		device->SetCullMode(2);*/
+		device->SetCullMode(2);
 
 		//meshes2.clear();
-		meshes3.clear();
+		//meshes3.clear();
+		//device->SetCullMode(2);
 		debug.Render(meshes2, meshes3); // grid, sphere
+		//device->SetCullMode(0);
 		device->EndRenderPass(final_fbo);
 
 		device->LayoutTransition(flip_texture, ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
 
-		device->BeginRenderPass({}, RenderPass::Clear::COLOR_DEPTH);
+		device->BeginRenderPass({}, RenderPass::Clear::COLOR);
 		device->BindPipeline(pipeline_flip);
 		device->BindDescriptorSet(Descriptor2::Set::SCENE, flip_scene_set);
 		device->BindDescriptorSet(Descriptor2::Set::MATERIAL, flip_material_set);
@@ -496,6 +519,7 @@ int main()
 		device->UnMapBuffer(text_vbo);
 
 		device->BindVertexBuffer(text_vbo);
+		//device->SetCullMode(0);
 		device->Draw(0, text_verts_count);
 
 		device->EndRenderPass({});

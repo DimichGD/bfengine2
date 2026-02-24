@@ -2,12 +2,6 @@
 #pragma shader_stage(fragment)
 
 layout(binding = 0) uniform sampler2D diffuse_map;
-//layout(set = 1, binding = 0) uniform sampler2D textures[32];
-
-/*layout(push_constant) uniform Constants
-{
-	layout(offset = 4) int U_MATERIAL_INDEX;
-};*/
 
 layout(location = 0) in vec2 TEXCOORD_0;
 layout(location = 0) out vec4 OUT_COLOR;
@@ -15,5 +9,4 @@ layout(location = 0) out vec4 OUT_COLOR;
 void main()
 {
 	OUT_COLOR = texture(diffuse_map, TEXCOORD_0);
-	//OUT_COLOR = texture(textures[U_MATERIAL_INDEX], TEXCOORD_0);
 }

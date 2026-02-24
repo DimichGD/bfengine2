@@ -178,11 +178,10 @@ struct Shader: Handle
 {
 	enum class Type: uint8_t
 	{
-		VERTEX   = 1 << 0,
-		FRAGMENT = 1 << 1,
-		GEOMETRY = 1 << 2,
-		COMPUTE  = 1 << 3,
-		VERTEX_FRAGMENT = VERTEX | FRAGMENT,
+		VERTEX,
+		FRAGMENT,
+		GEOMETRY,
+		COMPUTE,
 	};
 
 	Shader(uint32_t handle, Type type)
@@ -217,16 +216,25 @@ struct Descriptor2
 	};
 
 	Descriptor2() = delete;
-	Descriptor2(uint8_t set, uint8_t binding, Type type, uint8_t array_size, Shader::Type stage)
+	Descriptor2(uint8_t set, uint8_t binding, Type type, uint8_t array_size/*, Shader::Type stage*/)
 	{
 		this->set = set;
 		this->binding = binding;
 		this->type = type;
 		this->array_size = array_size;
-		this->stage = stage;
+		//this->stage = stage;
 	}
 
-	bool CompareWithoutStage(const Descriptor2 &other) const // FIXME: better naming
+	/*bool CompareWithoutStage(const Descriptor2 &other) const // FIXME: better naming
+	{
+		return
+			set == other.set &&
+			binding == other.binding &&
+			type == other.type &&
+			array_size == other.array_size;
+	}*/
+
+	bool operator==(const Descriptor2 &other) const
 	{
 		return
 			set == other.set &&
@@ -235,38 +243,37 @@ struct Descriptor2
 			array_size == other.array_size;
 	}
 
-	/*bool operator==(const Descriptor2 &other) const // FIXME: make another method for this
-	{
-		return
-			set == other.set &&
-			binding == other.binding &&
-			type == other.type &&
-			array_size == other.array_size;// &&
-			//stage == other.stage;
-	}*/
-
 	uint32_t Hash() const
 	{
-		return set | (binding << 4) | (uint8_t(type) << 8) | (array_size << 16) | (uint8_t(stage) << 24);
+		return set | (binding << 8) | (uint8_t(type) << 16) | (array_size << 24);
 	}
 
-	uint8_t set: 4 = 0;
-	uint8_t binding: 4 = 0;
+	uint8_t set = 0;
+	uint8_t binding = 0;
 	Type type = Type::UNIFORM_BUFFER;
 	uint8_t array_size = 0;
-	Shader::Type stage = Shader::Type::VERTEX;
+	//Shader::Type stage = Shader::Type::VERTEX;
 };
 
 struct Constant
 {
-	enum class Type
+	enum class Type: uint8_t
 	{
 		INT,
+		FLOAT,
 		VEC4,
 	};
 
-	uint32_t offset = 0;
-	uint32_t size = 0;
+	bool operator==(const Constant &other) const
+	{
+		return
+			offset == other.offset &&
+			size == other.size &&
+			type == other.type;
+	}
+
+	uint8_t offset = 0;
+	uint8_t size = 0;
 	Type type;
 };
 
@@ -275,11 +282,10 @@ struct DescriptorSet: Handle {};
 struct ShaderReflectionData
 {
 	std::string name;
-	//std::vector<Descriptor2> decriptors;
-	std::vector<Constant> constants;
 	uint32_t max_set = 0;
 	Shader::Type stage;
 
+	std::vector<Constant> constants;
 	std::array<std::vector<Descriptor2>, 4> sets {};
 };
 
@@ -327,11 +333,24 @@ enum class Topology
 	LINE_STRIP,
 };
 
+enum class DepthFunc
+{
+	NEVER,
+	ALWAYS,
+	LESS,
+	GREATER,
+	EQUAL,
+	NOT_EQUAL,
+	LESS_OR_EQUAL,
+	GREATER_OR_EQUAL,
+};
+
 struct Raster
 {
 	Blend blend = Blend::NONE;
 	bool depth_test = true;
 	bool depth_write = true;
+	DepthFunc depth_func = DepthFunc::LESS;
 };
 
 /*struct Descriptor

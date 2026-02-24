@@ -59,6 +59,7 @@ void GraphicsPipelineBuilder::SetLayout(VkPipelineLayout layout)
 
 void GraphicsPipelineBuilder::SetRasterState(Raster raster_state)
 {
+	depth_compare_op = vk::ConvertEnum(raster_state.depth_func);
 	depth_test_enable = raster_state.depth_test ? VK_TRUE : VK_FALSE;
 	depth_write_enable = raster_state.depth_write ? VK_TRUE : VK_FALSE;
 
@@ -695,7 +696,7 @@ VkPipeline GraphicsPipelineBuilder::Build(VkDevice device, VkPipelineCache pipel
 		.flags = 0,
 		.depthTestEnable = depth_test_enable,
 		.depthWriteEnable = depth_write_enable,
-		.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+		.depthCompareOp = depth_compare_op, //VK_COMPARE_OP_LESS_OR_EQUAL,
 		.depthBoundsTestEnable = VK_FALSE,
 		.stencilTestEnable = VK_FALSE,
 		.front = {},

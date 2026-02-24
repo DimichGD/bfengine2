@@ -26,7 +26,7 @@ public:
 
 	const DeviceLimits &Limits() const { return limits; }
 
-	void Create(SDL_Window *window_handle) override;
+	bool Create(SDL_Window *window_handle) override;
 	void Destroy() override;
 	void BeginRenderPass(FramebufferID framebuffer_id, RenderPass::Clear clear_flags) override;
 	void EndRenderPass(FramebufferID framebuffer_id) override;
@@ -48,14 +48,7 @@ public:
 
 	FramebufferID CreateFramebuffer(const FramebufferDesc &desc) override;
 
-	//Shader CreateShader(Shader::Type type, const std::string &source);
-	Shader CreateShader(Shader::Type type, const std::vector<char> &source);
 	Shader LoadShader(Shader::Type type, const std::string &name) override;
-	void SetUniform(Uniform::Name name, int value);
-	void SetUniform(Uniform::Name name, const glm::mat4 &value);
-	void SetUniform(Uniform::Name name, const glm::vec4 &value);
-	void SetUniform(Uniform::Texture name, const Texture &value);
-	void SetUniform(Uniform::Buffer name, const GPUBuffer &value);
 	//void WriteUniform(const Uniform &uniform);
 
 	template<typename T>
@@ -84,20 +77,6 @@ public:
 	void Draw(uint32_t first, uint32_t count) override;
 	void DrawIndexed(uint32_t first, uint32_t count) override;
 
-	void CreateDescriptor(Uniform::Texture name, Texture value)
-	{
-		//descriptors.push_back(DescriptorTexture { name, value });
-		descriptors.push_back({ std::to_underlying(name), value });
-	}
-
-	void CreateDescriptor(Uniform::Name name, glm::vec4 value)
-	{
-		//descriptors.push_back(DescriptorVec4 { std::to_underlying(name), value });
-		descriptors.push_back({ std::to_underlying(name), value });
-	}
-
-	void BindDescriptors(size_t index, size_t count);
-
 protected:
 	Program CreateProgram(const std::vector<Shader> &shaders);
 	VertexLayout CreateVertexLayout(Vertex::Attrib attribs);
@@ -109,11 +88,11 @@ private:
 	DeviceLimits limits;
 	Pipeline current_pipeline {};
 
-	struct Descriptor
+	/*struct Descriptor
 	{
 		int location = -1;
 		std::variant<Texture, glm::vec4> value;
-	};
+	};*/
 
 	struct Descriptor3
 	{
@@ -121,7 +100,7 @@ private:
 		std::variant<Texture, GPUBuffer> value;
 	};
 
-	std::vector<Descriptor> descriptors;
+	//std::vector<Descriptor> descriptors;
 	std::vector<std::map<uint32_t, Descriptor3>> descriptors2;
 	std::vector<Pipeline> pipelines;
 };

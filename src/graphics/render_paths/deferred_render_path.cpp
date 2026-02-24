@@ -3,7 +3,7 @@
 
 BF_BEGIN_NAMESPACE
 
-Deferred::Deferred(RenderDeviceGL *device, Config *config, ResourceManager *resources)
+Deferred::Deferred(RenderDevice *device, Config *config, ResourceManager *resources)
 {
 	this->device = device;
 	this->config = config;

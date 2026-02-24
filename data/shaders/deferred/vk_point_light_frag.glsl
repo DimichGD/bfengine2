@@ -21,6 +21,7 @@ layout(set = 1, binding = 3) uniform sampler2D depth_map;
 
 layout(push_constant) uniform Constants
 {
+	//layout(offset = 0) int U_OBJECT_INDEX;
 	layout(offset = 4) int U_MATERIAL_INDEX;
 };
 

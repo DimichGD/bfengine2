@@ -27,7 +27,6 @@ struct Pipeline
 	VkPipeline pipeline;
 	VkPipelineLayout layout;
 	std::vector<VkDescriptorSetLayout> decriptor_set_layouts;
-	//VkDescriptorSetLayout decriptor_set_layouts[3] { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE };
 };
 
 BF_END_VK_NAMESPACE

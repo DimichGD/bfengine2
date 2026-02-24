@@ -11,7 +11,6 @@ class IMaterial
 {
 public:
 	virtual ~IMaterial() = default;
-	virtual void Setup(RenderDeviceVK *device, DescriptorSet descriptor_set) = 0;
 	virtual void Setup(RenderDevice *device, DescriptorSet descriptor_set) = 0;
 };
 
@@ -21,11 +20,6 @@ public:
 	Material(Texture diffuse_map)
 	{
 		this->diffuse_map = diffuse_map;
-	}
-
-	void Setup(RenderDeviceVK *device, DescriptorSet descriptor_set) override
-	{
-		device->WriteDescriptor(descriptor_set, 0, diffuse_map);
 	}
 
 	void Setup(RenderDevice *device, DescriptorSet descriptor_set) override
@@ -45,13 +39,6 @@ public:
 		this->diffuse_map = diffuse_map;
 		this->normal_map = normal_map;
 		this->specular_map = specular_map;
-	}
-
-	void Setup(RenderDeviceVK *device, DescriptorSet descriptor_set) override
-	{
-		device->WriteDescriptor(descriptor_set, 0, diffuse_map);
-		device->WriteDescriptor(descriptor_set, 1, normal_map);
-		device->WriteDescriptor(descriptor_set, 2, specular_map);
 	}
 
 	void Setup(RenderDevice *device, DescriptorSet descriptor_set) override
@@ -90,7 +77,6 @@ class ResourceManager
 {
 public:
 	ResourceManager(RenderDevice *device, FileSystem *fs);
-	ResourceManager(RenderDeviceVK *device, FileSystem *fs);
 	~ResourceManager();
 	BF_NON_COPYABLE(ResourceManager)
 	BF_NON_MOVABLE(ResourceManager)
@@ -101,7 +87,6 @@ public:
 
 private:
 	RenderDevice *device = nullptr;
-	RenderDeviceVK *device2 = nullptr;
 	FileSystem *fs = nullptr;
 
 	std::map<std::string, std::shared_ptr<IMaterial>> materials;
