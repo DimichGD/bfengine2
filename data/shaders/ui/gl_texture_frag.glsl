@@ -8,12 +8,7 @@ layout(std140, binding = 1) uniform Colors
 
 layout(binding = 0) uniform sampler2D diffuse_map;
 
-/*layout(push_constant) uniform Constants
-{
-	layout(offset = 4) int U_MATERIAL_INDEX;
-};*/
-
-layout(location = 1) uniform int U_MATERIAL_INDEX;
+layout(location = 0) uniform int U_MATERIAL_INDEX;
 
 layout(location = 0) in vec2 TEXCOORD_0;
 layout(location = 0) out vec4 OUT_COLOR;

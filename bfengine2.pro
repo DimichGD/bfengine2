@@ -20,11 +20,11 @@ SOURCES += \
     src/graphics/render_paths/debug_render_path.cpp \
     src/graphics/render_paths/deferred_render_path.cpp \
     src/graphics/render_paths/point_light_render_path.cpp \
-    src/graphics/vulkan/convert_enum_vk.cpp \
-    src/graphics/vulkan/enumerate_stuff_vk.cpp \
-    src/graphics/vulkan/render_device_vk.cpp \
+    src/graphics/vulkan/vk_convert_enum.cpp \
+    src/graphics/vulkan/vk_enumerate_stuff.cpp \
     src/graphics/vulkan/vk_internal.cpp \
     src/graphics/vulkan/vk_pipeline_builder.cpp \
+    src/graphics/vulkan/vk_render_device.cpp \
     src/graphics/vulkan/vk_shader_reflection.cpp \
     src/io/file.cpp \
     src/main.cpp \
@@ -33,6 +33,8 @@ SOURCES += \
     src/platform/window_sdl2.cpp \
     src/ui/font.cpp \
     src/ui/ui_manager.cpp \
+    src/utils/lexer.cpp \
+    src/utils/parser.cpp \
     src/utils/utf8.cpp
 
 HEADERS += \
@@ -53,11 +55,11 @@ HEADERS += \
     src/graphics/render_paths/graphics_context.hpp \
     src/graphics/render_paths/point_light_render_path.hpp \
     src/graphics/types.hpp \
-    src/graphics/vulkan/convert_enum_vk.hpp \
-    src/graphics/vulkan/enumerate_stuff_vk.hpp \
-    src/graphics/vulkan/render_device_vk.hpp \
+    src/graphics/vulkan/vk_convert_enum.hpp \
+    src/graphics/vulkan/vk_enumerate_stuff.hpp \
     src/graphics/vulkan/vk_internal.hpp \
     src/graphics/vulkan/vk_pipeline_builder.hpp \
+    src/graphics/vulkan/vk_render_device.hpp \
     src/graphics/vulkan/vk_shader_reflection.hpp \
     src/io/file.hpp \
     src/math/matrix.hpp \
@@ -66,6 +68,8 @@ HEADERS += \
     src/ui/font.hpp \
     src/ui/ui_manager.hpp \
     src/utils/hash.hpp \
+    src/utils/lexer.hpp \
+    src/utils/parser.hpp \
     src/utils/utf8.hpp
 
 PKGCONFIG += freetype2 shaderc spirv-cross-c-shared

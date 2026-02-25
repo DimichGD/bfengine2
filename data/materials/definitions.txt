@@ -1,0 +1,16 @@
+definition doom_static
+{
+	fragment_shader "deferred/vk_texture"
+	{
+		texture diffuse_map srgba
+		texture normal_map rgba
+		texture specular_map rgba
+	}
+	
+	vertex_shader "deferred/vk_texture"
+	{
+		buffer CAMERA_MATRICES
+		buffer MODEL_MATRICES
+		constant OBJECT_INDEX
+	}
+}

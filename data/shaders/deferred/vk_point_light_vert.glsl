@@ -27,6 +27,7 @@ layout(push_constant) uniform Constants
 };
 
 //layout(location = 0) out vec2 POSITION;
+layout(location = 0) out vec2 POSITION;
 
 void main()
 {
@@ -34,5 +35,6 @@ void main()
 	vec3 offset = U_POINT_LIGHTS[U_OBJECT_INDEX].xyz;
 	float radius = U_POINT_LIGHTS[U_OBJECT_INDEX].w;
 	gl_Position = U_PROJ_MATRIX * U_VIEW_MATRIX * /*U_MODEL_MATRICES[U_OBJECT_INDEX] **/ vec4((IN_POSITION + offset) * radius, 1.0);
+	POSITION = gl_Position.xy / gl_Position.w;
 	//POSITION = gl_Position.xy;
 }

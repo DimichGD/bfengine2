@@ -487,7 +487,7 @@ struct TextureDesc
 
 struct Framebuffer
 {
-	enum class Attachment
+	/*enum class Attachment
 	{
 		COLOR_0,
 		COLOR_1,
@@ -498,7 +498,7 @@ struct Framebuffer
 		COLOR_6,
 		COLOR_7,
 		DEPTH_STENCIL,
-	};
+	};*/
 
 	std::vector<Texture> color_textures;
 	std::vector<Texture::Format> color_formats;

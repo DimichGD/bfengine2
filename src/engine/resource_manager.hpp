@@ -1,7 +1,9 @@
 #pragma once
+#include "core/log.hpp"
 #include "graphics/opengl/render_device_gl.hpp"
 #include "graphics/render_device.hpp"
-#include "graphics/vulkan/render_device_vk.hpp"
+#include "graphics/render_paths/graphics_context.hpp"
+#include "graphics/vulkan/vk_render_device.hpp"
 #include <memory>
 #include <string>
 
@@ -12,6 +14,7 @@ class IMaterial
 public:
 	virtual ~IMaterial() = default;
 	virtual void Setup(RenderDevice *device, DescriptorSet descriptor_set) = 0;
+	virtual void Setup2(RenderDevice *device, GraphicsContext *context, Descriptor2::Set set_index, DescriptorSet descriptor_set) {}
 };
 
 class Material: public IMaterial
@@ -54,7 +57,108 @@ private:
 	Texture specular_map;
 };
 
+
+
 struct MaterialID: Handle {};
+
+enum class EngineDescriptor
+{
+	CAMERA_MATRICES,
+	MODEL_MATRICES,
+	MATERIAL_DATA,
+	//CUSTOM_DATA,
+	LIGHT_CAMERA_DATA,
+	POINT_LIGHTS,
+	SPOT_LIGHTS,
+	AREA_LIGHTS,
+	BONE_MATRICES,
+};
+
+enum class EngineConstants
+{
+	OBJECT_INDEX,
+	MATERIAL_INDEX,
+	FACTOR,
+	TIME,
+};
+
+struct TextureInputDesc
+{
+	//std::string slot_name;
+	Texture::Format format;
+};
+
+struct MaterialDefinition
+{
+	std::vector<EngineDescriptor> descriptors;
+	std::vector<EngineConstants> constants;
+	std::unordered_map<std::string, TextureInputDesc> textures;
+	Shader vertex_shader;
+	Shader fragment_shader;
+};
+
+class CustomMaterial: public IMaterial
+{
+public:
+	CustomMaterial(std::string name, MaterialDefinition *definition, const std::vector<Texture> &textures)
+	{
+		this->def = definition;
+		this->textures = std::move(textures);
+		this->name = name;
+	}
+
+	void Setup(RenderDevice *device, DescriptorSet descriptor_set) override
+	{
+		std::terminate();
+	}
+
+	void Setup2(RenderDevice *device, GraphicsContext *context, Descriptor2::Set set_index, DescriptorSet descriptor_set) override
+	{
+		device->WriteDescriptor(descriptor_set, 0, textures.at(0));
+		device->WriteDescriptor(descriptor_set, 1, textures.at(1));
+		device->WriteDescriptor(descriptor_set, 2, textures.at(2));
+
+		/*switch (set_index)
+		{
+			case Descriptor2::Set::SCENE:
+				for (uint32_t i = 0; i < def->descriptors.size(); i++)
+				{
+					switch (def->descriptors[i])
+					{
+
+						case EngineDescriptor::CAMERA_MATRICES:
+							device->WriteDescriptor(descriptor_set, i, context->active_camera_ubo);
+							break;
+
+						case EngineDescriptor::MODEL_MATRICES:
+							device->WriteDescriptor(descriptor_set, i, context->model_matrices_ubo);
+							break;
+
+						default:
+							Log() << "Setup2 switch failed";
+							break;
+					}
+				}
+				break;
+
+			case Descriptor2::Set::MATERIAL:
+				for (uint32_t i = 0; i < def->textures.size(); i++)
+				{
+					device->WriteDescriptor(descriptor_set, i, textures.at(i));
+				}
+				break;
+
+			case Descriptor2::Set::OBJECT:
+				break;
+		}*/
+	}
+
+std::string name;
+
+private:
+	MaterialDefinition *def = nullptr;
+	std::vector<Texture> textures;
+};
 
 struct Surface
 {
@@ -68,6 +172,7 @@ struct Surface
 struct Mesh
 {
 	//Range surfaces {};
+	std::string name;
 	std::vector<Surface> surfaces;
 	GPUBuffer vbo {};
 	uint32_t matrix_index = 0;
@@ -81,15 +186,18 @@ public:
 	BF_NON_COPYABLE(ResourceManager)
 	BF_NON_MOVABLE(ResourceManager)
 
-	Texture LoadTexture(std::string_view filename);
-	Mesh    LoadMesh(std::string_view filename);
+	Texture	LoadKTX2(std::string_view filename, Texture::Format format = Texture::Format::SRGBA8);
+	Texture LoadTexture(std::string_view filename, Texture::Format format = Texture::Format::SRGBA8);
 	auto    LoadMaterial(const std::string &name) -> std::shared_ptr<IMaterial>;
+
+	Mesh    LoadMesh(std::string_view filename);
 
 private:
 	RenderDevice *device = nullptr;
 	FileSystem *fs = nullptr;
 
 	std::map<std::string, std::shared_ptr<IMaterial>> materials;
+	std::map<std::string, MaterialDefinition> material_descriptions;
 };
 
 BF_END_NAMESPACE

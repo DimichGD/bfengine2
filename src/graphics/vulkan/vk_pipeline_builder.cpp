@@ -1,6 +1,7 @@
 #include "graphics/vulkan/vk_pipeline_builder.hpp"
 #include "core/log.hpp"
-#include "graphics/vulkan/convert_enum_vk.hpp"
+#include "graphics/vulkan/vk_convert_enum.hpp"
+#include "graphics/vulkan/vk_shader_reflection.hpp"
 #include "utils/hash.hpp"
 #include <glm/common.hpp>
 
@@ -200,93 +201,15 @@ VkPipeline GraphicsPipelineBuilder::CreateVertexInputStage(Vertex::Attrib vertex
 }
 
 VkPipeline GraphicsPipelineBuilder::CreateVertexShaderStage(const std::string &name, std::span<const uint32_t> binary,
-															ShaderReflectionData reflection_data, VkPipelineLayout *out)
+															VkPipelineLayout layout)
 {
 	// -------------------------------
-	throw "Unimplemented";
 
-	/*std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> bindings;
-	std::vector<VkPushConstantRange> push_constant_ranges;
-
-	for (auto &desc: reflection_data.decriptors)
-	{
-		VkDescriptorSetLayoutBinding binding
-		{
-			.binding = desc.binding,
-			.descriptorType = vk::ConvertEnum(desc.type),
-			.descriptorCount = desc.array_size,
-			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-			.pImmutableSamplers = nullptr,
-		};
-
-		bindings[desc.set].push_back(binding);
-	}
-
-	for (auto &desc: reflection_data.constants)
-	{
-		VkPushConstantRange push_constant_range
-		{
-			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-			.offset = desc.offset,
-			.size = desc.size, //const_sizes_map[desc.type],
-		};
-
-		//Log() << int(shader.type) << desc.offset << desc.size;
-
-		push_constant_ranges.push_back(push_constant_range);
-	}
-
+	/*std::map<uint32_t, VkDescriptorSetLayout> global_descriptor_set_layouts;
+	std::array<ConstantRange, 4> constant_ranges;
 	std::vector<VkDescriptorSetLayout> decriptor_set_layouts;
-
-	for (auto &set: bindings)
-	{
-		std::vector<VkDescriptorBindingFlags> flags(set.second.size());
-		for (uint32_t i = 0; i < set.second.size(); i++)
-			flags[i] = (set.second.at(i).descriptorCount > 1) ? VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT : 0;
-
-		VkDescriptorSetLayoutBindingFlagsCreateInfo flags_ci
-		{
-			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
-			.pNext = nullptr,
-			.bindingCount = uint32_t(flags.size()),
-			.pBindingFlags = flags.data(),
-		};
-
-		VkDescriptorSetLayoutCreateInfo descriptor_set_layout_ci
-		{
-			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-			.pNext = &flags_ci,
-			.flags = 0,
-			.bindingCount = uint32_t(set.second.size()),
-			.pBindings = set.second.data(),
-		};
-
-		//VkDescriptorSetLayout descriptor_set_layout;
-		//vkCreateDescriptorSetLayout(vk->device, &descriptor_set_layout_ci, nullptr, &descriptor_set_layout);
-		//assert(set.first <= 3);
-		VkDescriptorSetLayout decriptor_set_layout;
-		vkCreateDescriptorSetLayout(device, &descriptor_set_layout_ci, nullptr, &decriptor_set_layout);
-
-		decriptor_set_layouts.push_back(decriptor_set_layout);
-
-		//layouts.push_back(descriptor_set_layout);
-		//store->descriptor_layouts.push_back(descriptor_set_layout);
-	}
-
-	VkPipelineLayoutCreateInfo pipeline_layout_ci =
-	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.pNext = nullptr,
-		.flags = VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT,
-		.setLayoutCount = uint32_t(decriptor_set_layouts.size()),
-		.pSetLayouts = decriptor_set_layouts.data(),
-		.pushConstantRangeCount = uint32_t(push_constant_ranges.size()),
-		.pPushConstantRanges = push_constant_ranges.data(),
-	};
-
-	VkPipelineLayout layout;
-	vkCreatePipelineLayout(device, &pipeline_layout_ci, nullptr, &layout);
-	*out = layout;*/
+	*out = CreatePipelineLayout(device, global_descriptor_set_layouts, { &reflection_data }, constant_ranges,
+								decriptor_set_layouts, VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);*/
 
 	// -------------------------------
 
@@ -299,14 +222,6 @@ VkPipeline GraphicsPipelineBuilder::CreateVertexShaderStage(const std::string &n
 		.codeSize = binary.size() * 4,
 		.pCode = binary.data(),
 	};
-
-	/*VkShaderModule module;
-	VkResult result = vkCreateShaderModule(device, &shader_ci, nullptr, &module);
-	if (result != VK_SUCCESS)
-	{
-		Log() << "vkCreateShaderModule failed";
-		return {};
-	}*/
 
 	VkPipelineShaderStageCreateInfo shader_stage_ci
 	{
@@ -378,96 +293,14 @@ VkPipeline GraphicsPipelineBuilder::CreateVertexShaderStage(const std::string &n
 }
 
 VkPipeline GraphicsPipelineBuilder::CreateFragmentShaderStage(const std::string &name, std::span<const uint32_t> binary,
-															  ShaderReflectionData reflection_data, VkPipelineLayout *out)
+															  VkPipelineLayout layout)
 {
 	// -------------------------------
-	throw "Unimplemented";
-
-	/*std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> bindings;
-	std::vector<VkPushConstantRange> push_constant_ranges;
-
-	for (uint32_t i = 0; i < reflection_data.max_set; i++)
-		bindings[i] = {};
-
-	for (auto &desc: reflection_data.decriptors)
-	{
-		VkDescriptorSetLayoutBinding binding
-		{
-			.binding = desc.binding,
-			.descriptorType = vk::ConvertEnum(desc.type),
-			.descriptorCount = desc.array_size,
-			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-			.pImmutableSamplers = nullptr,
-		};
-
-		bindings[desc.set].push_back(binding);
-	}
-
-	for (auto &desc: reflection_data.constants)
-	{
-		VkPushConstantRange push_constant_range
-		{
-			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-			.offset = desc.offset,
-			.size = desc.size, //const_sizes_map[desc.type],
-		};
-
-		//Log() << int(shader.type) << desc.offset << desc.size;
-
-		push_constant_ranges.push_back(push_constant_range);
-	}
-
+	/*std::map<uint32_t, VkDescriptorSetLayout> global_descriptor_set_layouts;
+	std::array<ConstantRange, 4> constant_ranges;
 	std::vector<VkDescriptorSetLayout> decriptor_set_layouts;
-
-	for (auto &set: bindings)
-	{
-		std::vector<VkDescriptorBindingFlags> flags(set.second.size());
-		for (uint32_t i = 0; i < set.second.size(); i++)
-			flags[i] = (set.second.at(i).descriptorCount > 1) ? VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT : 0;
-
-		VkDescriptorSetLayoutBindingFlagsCreateInfo flags_ci
-		{
-			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
-			.pNext = nullptr,
-			.bindingCount = uint32_t(flags.size()),
-			.pBindingFlags = flags.data(),
-		};
-
-		VkDescriptorSetLayoutCreateInfo descriptor_set_layout_ci
-		{
-			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-			.pNext = &flags_ci,
-			.flags = 0,
-			.bindingCount = uint32_t(set.second.size()),
-			.pBindings = set.second.data(),
-		};
-
-		//VkDescriptorSetLayout descriptor_set_layout;
-		//vkCreateDescriptorSetLayout(vk->device, &descriptor_set_layout_ci, nullptr, &descriptor_set_layout);
-		//assert(set.first <= 3);
-		VkDescriptorSetLayout decriptor_set_layout;
-		vkCreateDescriptorSetLayout(device, &descriptor_set_layout_ci, nullptr, &decriptor_set_layout);
-
-		decriptor_set_layouts.push_back(decriptor_set_layout);
-
-		//layouts.push_back(descriptor_set_layout);
-		//store->descriptor_layouts.push_back(descriptor_set_layout);
-	}
-
-	VkPipelineLayoutCreateInfo pipeline_layout_ci =
-	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.pNext = nullptr,
-		.flags = VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT,
-		.setLayoutCount = uint32_t(decriptor_set_layouts.size()),
-		.pSetLayouts = decriptor_set_layouts.data(),
-		.pushConstantRangeCount = uint32_t(push_constant_ranges.size()),
-		.pPushConstantRanges = push_constant_ranges.data(),
-	};
-
-	VkPipelineLayout layout;
-	vkCreatePipelineLayout(device, &pipeline_layout_ci, nullptr, &layout);
-	*out = layout;*/
+	*out = CreatePipelineLayout(device, global_descriptor_set_layouts, { &layout }, constant_ranges,
+								decriptor_set_layouts, VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);*/
 
 	// -------------------------------
 
@@ -522,7 +355,7 @@ VkPipeline GraphicsPipelineBuilder::CreateFragmentShaderStage(const std::string 
 		.viewMask = 0,
 		.colorAttachmentCount = uint32_t(attachment_formats.size()),
 		.pColorAttachmentFormats = attachment_formats.data(),
-		.depthAttachmentFormat = vk::ConvertEnum(Texture::Format::D24S8), // TODO: if depth buffer is not present
+		.depthAttachmentFormat = vk::ConvertEnum(bf::Texture::Format::D24S8), // TODO: if depth buffer is not present
 		.stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
 	};
 
@@ -608,7 +441,7 @@ VkPipeline GraphicsPipelineBuilder::CreateFragmentOutputStage(Raster raster_stat
 		.viewMask = 0,
 		.colorAttachmentCount = uint32_t(attachment_formats.size()),
 		.pColorAttachmentFormats = attachment_formats.data(),
-		.depthAttachmentFormat = vk::ConvertEnum(Texture::Format::D24S8), // TODO: if depth buffer is not present
+		.depthAttachmentFormat = vk::ConvertEnum(bf::Texture::Format::D24S8), // TODO: if depth buffer is not present
 		.stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
 	};
 
@@ -750,7 +583,7 @@ VkPipeline GraphicsPipelineBuilder::Build(VkDevice device, VkPipelineCache pipel
 	};
 
 	//VkFormat attachment_formats[1] { swapchain_format };
-	const VkPipelineRenderingCreateInfoKHR pipeline_rendering_ci
+	const VkPipelineRenderingCreateInfo pipeline_rendering_ci
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
 		.pNext = nullptr,

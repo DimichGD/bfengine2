@@ -73,8 +73,11 @@ bool RenderDeviceGL::Create(SDL_Window *window_handle)
 	GLuint sampler;
 	glCreateSamplers(1, &sampler);
 	glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // GL_LINEAR_MIPMAP_LINEAR
+	glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // GL_LINEAR_MIPMAP_LINEAR
 	glBindSampler(0, sampler);
+	glBindSampler(1, sampler);
+	glBindSampler(2, sampler);
+	glBindSampler(3, sampler);
 
 	glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
 	glFrontFace(GL_CCW);
@@ -249,13 +252,23 @@ void RenderDeviceGL::BindDescriptorSet(Descriptor2::Set index, DescriptorSet des
 	}
 }
 
-void RenderDeviceGL::Push(Shader::Type type, uint32_t offset, int value)
+/*void RenderDeviceGL::Push(Shader::Type type, uint32_t offset, int value)
 {
 	if (offset == 0)
 		glUniform1i(0, value);
 
 	else if (offset == 4)
 		glUniform1i(1, value);
+}*/
+
+void RenderDeviceGL::PushConstant(uint32_t slot, int value)
+{
+	glUniform1i(slot, value);
+}
+
+void RenderDeviceGL::PushConstant(uint32_t slot, float value)
+{
+	glUniform1f(slot, value);
 }
 
 FramebufferID RenderDeviceGL::CreateFramebuffer(const FramebufferDesc &desc)
@@ -422,7 +435,15 @@ Texture RenderDeviceGL::CreateTexture(const std::string &name, const TextureDesc
 	glTextureStorage2D(tex, levels, format.internal_format, desc.width, desc.height);
 
 	if (desc.pixels != nullptr)
-		glTextureSubImage2D(tex, 0, 0, 0, desc.width, desc.height, format.format, format.type, desc.pixels);
+	{
+		uint32_t offset = 0;
+		for (uint32_t i = 0; i < desc.levels; i++)
+		{
+			glTextureSubImage2D(tex, i, 0, 0, desc.width >> i, desc.height >> i, format.format, format.type,
+								(char *)desc.pixels + offset);
+			offset += (desc.width >> i) * (desc.height >> i) * 4; // TODO: get format pixel size
+		}
+	}
 
 	if (desc.generate_mipmaps)
 		glGenerateTextureMipmap(tex);

@@ -1,0 +1,21 @@
+material "wall/gotbwall4"
+{
+	def doom_static
+	textures
+	{
+		diffuse_map "wall/gotbwall4_d.ktx"
+		normal_map "wall/gotbwall4_local.ktx"
+		specular_map "wall/gotbwall4_s.ktx"
+	}
+}
+
+material "floor/diafloor"
+{
+	def doom_static
+	textures:
+	{
+		diffuse_map "floor/diafloor_d.ktx"
+		normal_map "floor/diafloor_local.ktx"
+		specular_map "floor/diafloor_s.ktx"
+	}
+}

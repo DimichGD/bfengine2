@@ -1,7 +1,7 @@
 #pragma once
 #include "engine/resource_manager.hpp"
 #include "graphics/render_paths/graphics_context.hpp"
-#include "graphics/vulkan/render_device_vk.hpp"
+#include "graphics/vulkan/vk_render_device.hpp"
 
 BF_BEGIN_NAMESPACE
 

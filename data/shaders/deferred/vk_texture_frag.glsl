@@ -6,9 +6,9 @@ layout(set = 1, binding = 1) uniform sampler2D normal_map;
 layout(set = 1, binding = 2) uniform sampler2D specular_map;
 
 layout(location = 0) in vec2 TEXCOORD_0;
-layout(location = 2) in vec3 NORMAL;
-layout(location = 3) in vec3 BINORMAL;
-layout(location = 4) in vec3 TANGENT;
+layout(location = 1) in vec3 NORMAL;
+layout(location = 2) in vec3 BINORMAL;
+layout(location = 3) in vec3 TANGENT;
 
 layout(location = 0) out vec4 OUT_COLOR_0;
 layout(location = 1) out vec4 OUT_COLOR_1;

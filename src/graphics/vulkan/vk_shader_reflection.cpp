@@ -1,6 +1,7 @@
 #include "graphics/vulkan/vk_shader_reflection.hpp"
 #include "core/log.hpp"
-#include "graphics/vulkan/convert_enum_vk.hpp"
+#include "graphics/vulkan/vk_convert_enum.hpp"
+#include "graphics/vulkan/vk_internal.hpp"
 #include "utils/hash.hpp"
 #include <glm/common.hpp>
 #include <shaderc/shaderc.h>
@@ -138,10 +139,11 @@ std::vector<uint32_t> CompileShader(const std::string &name, const std::vector<c
 VkPipelineLayout CreatePipelineLayout(VkDevice device,
 									  std::map<uint32_t, VkDescriptorSetLayout> &global_descriptor_set_layouts,
 									  const std::vector<ShaderReflectionData *> &reflection_data,
+									  std::array<ConstantRange, 4> &constant_ranges,
 									  std::vector<VkDescriptorSetLayout> &decriptor_set_layouts,
 									  VkPipelineLayoutCreateFlags flags)
 {
-	std::vector<VkPushConstantRange> push_constant_ranges;
+	/*std::vector<VkPushConstantRange> push_constant_ranges;
 
 	// TODO: overlapping ranges
 	for (const ShaderReflectionData *data: reflection_data)
@@ -157,7 +159,7 @@ VkPipelineLayout CreatePipelineLayout(VkDevice device,
 
 			push_constant_ranges.push_back(push_constant_range);
 		}
-	}
+	}*/
 
 	//
 	/*Log() << "--------------------------";
@@ -192,7 +194,7 @@ VkPipelineLayout CreatePipelineLayout(VkDevice device,
 	};*/
 
 	std::array<std::vector<StageDescriptor>, 4> combined_descriptors;
-	//std::vector<StageConstant> combined_constants;
+	std::vector<ConstantRange> combined_constants;
 
 	for (const ShaderReflectionData *data: reflection_data)
 	{
@@ -211,17 +213,18 @@ VkPipelineLayout CreatePipelineLayout(VkDevice device,
 			}
 		}
 
-		/*for (auto &constant: data->constants)
+		for (auto &constant: data->constants)
 		{
 			auto it = std::find_if(combined_constants.begin(), combined_constants.end(),
-								   [&constant](const StageConstant &other){ return other.constant == constant; });
+				[&constant](const ConstantRange &other)
+					{ return other.offset == constant.offset && other.size == constant.size; });
 
 			if (it != combined_constants.end())
 				it->stage_flags |= vk::ConvertEnum(data->stage);
 
 			else
-				combined_constants.push_back({ constant, vk::ConvertEnum(data->stage) });
-		}*/
+				combined_constants.push_back({ vk::ConvertEnum(data->stage), constant.offset, constant.size });
+		}
 	}
 
 	// sort descriptors by binding
@@ -310,20 +313,22 @@ VkPipelineLayout CreatePipelineLayout(VkDevice device,
 
 	// push constant ranges
 
-	/*std::vector<VkPushConstantRange> push_constant_ranges;
+	std::vector<VkPushConstantRange> push_constant_ranges;
 	push_constant_ranges.reserve(combined_constants.size());
 
+	uint32_t range_index = 0;
 	for (auto &constant: combined_constants)
 	{
 		VkPushConstantRange range
 		{
 			.stageFlags = constant.stage_flags,
-			.offset = constant.constant.offset,
-			.size = constant.constant.size,
+			.offset = constant.offset,
+			.size = constant.size,
 		};
 
 		push_constant_ranges.push_back(range);
-	}*/
+		constant_ranges.at(range_index++) = constant;
+	}
 
 	// create pipeline layout
 

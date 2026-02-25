@@ -1,11 +1,13 @@
 #include "core/log.hpp"
 #include "graphics/render_doc.hpp"
 #include "graphics/vulkan/vk_internal.hpp"
-#include "graphics/vulkan/render_device_vk.hpp"
-#include "graphics/vulkan/convert_enum_vk.hpp"
+#include "graphics/vulkan/vk_render_device.hpp"
+#include "graphics/vulkan/vk_convert_enum.hpp"
 #include "graphics/vulkan/vk_shader_reflection.hpp"
 #include "graphics/vulkan/vk_pipeline_builder.hpp"
 #include "io/file.hpp"
+#include "utils/lexer.hpp"
+#include <SDL3/SDL_timer.h>
 #include <fmt/format.h>
 #include <glm/gtc/type_ptr.hpp>
 //#include <spirv_cross/spirv_cross_c.h>
@@ -23,7 +25,7 @@ struct Shader
 	bf::Shader::Type type;
 	VkPipelineLayout layout;
 };
-BF_END_NAMESPACE
+BF_END_VK_NAMESPACE
 
 struct RenderDeviceVK::Storage
 {
@@ -102,6 +104,7 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 	};
 
 	vkCreateCommandPool(vk->device, &poolInfo, nullptr, &vk->graphics_command_pool);
+	vk->frame_resources.resize(2);
 
 	VkCommandBufferAllocateInfo allocInfo
 	{
@@ -112,10 +115,11 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 		.commandBufferCount = 1,
 	};
 
-	for (uint32_t i = 0; i < vk->frames.size(); i++)
+	for (uint32_t i = 0; i < vk->frame_resources.size(); i++)
 	{
-		vkAllocateCommandBuffers(vk->device, &allocInfo, &vk->frames[i].command_buffer);
-		vk->SetObjectName(VK_OBJECT_TYPE_COMMAND_BUFFER, vk->frames[i].command_buffer, "Graphics Command Buffer");
+		vkAllocateCommandBuffers(vk->device, &allocInfo, &vk->frame_resources[i].command_buffer);
+		vk->SetObjectName(VK_OBJECT_TYPE_COMMAND_BUFFER, vk->frame_resources[i].command_buffer,
+						  fmt::format("Graphics Command Buffer {}", i).c_str());
 
 		VkSemaphoreCreateInfo semaphore_ci
 		{
@@ -124,20 +128,68 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 			.flags = 0,
 		};
 
-		//vkCreateSemaphore(vk->device, &semaphore_ci, nullptr, &vk->frames[i].swapchain_semaphore);
-		vkCreateSemaphore(vk->device, &semaphore_ci, nullptr, &vk->frames[i].render_semaphore);
+		vkCreateSemaphore(vk->device, &semaphore_ci, nullptr, &vk->frame_resources[i].present_semaphore);
+		vk->SetObjectName(VK_OBJECT_TYPE_SEMAPHORE, vk->frame_resources[i].present_semaphore,
+						  fmt::format("Present Semaphore {}", i).c_str());
 
-		/*VkFenceCreateInfo fence_ci
+		VkFenceCreateInfo fence_ci
 		{
 			.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
 			.pNext = nullptr,
 			.flags = VK_FENCE_CREATE_SIGNALED_BIT,
 		};
 
-		vkCreateFence(vk->device, &fence_ci, nullptr, &vk->frames[i].fence);*/
+		vkCreateFence(vk->device, &fence_ci, nullptr, &vk->frame_resources[i].fence);
+		vk->SetObjectName(VK_OBJECT_TYPE_FENCE, vk->frame_resources[i].fence,
+						  fmt::format("Fence {}", i).c_str());
+
+		// new stuff
+
+		/*vkCreateSemaphore(vk->device, &semaphore_ci, nullptr, &vk->frame_resources[i].render_semaphore);
+		vk->SetObjectName(VK_OBJECT_TYPE_SEMAPHORE, vk->frame_resources[i].render_semaphore,
+						  fmt::format("new render_semaphore {}", i).c_str());*/
+	};
+
+	for (uint32_t i = 0; i < vk->swapchain_resources.size(); i++)
+	{
+		VkSemaphoreCreateInfo semaphore_ci
+		{
+			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+		};
+
+		vkCreateSemaphore(vk->device, &semaphore_ci, nullptr, &vk->swapchain_resources[i].render_semaphore);
+		vk->SetObjectName(VK_OBJECT_TYPE_SEMAPHORE, vk->swapchain_resources[i].render_semaphore,
+						  fmt::format("Render Semaphore {}", i).c_str());
+
+		// new stuff
+
+		/*vkCreateSemaphore(vk->device, &semaphore_ci, nullptr, &vk->swapchain_resources[i].acquire_semaphore);
+		vk->SetObjectName(VK_OBJECT_TYPE_SEMAPHORE, vk->swapchain_resources[i].acquire_semaphore,
+						  fmt::format("new acquire_semaphore {}", i).c_str());
+
+		vkCreateSemaphore(vk->device, &semaphore_ci, nullptr, &vk->swapchain_resources[i].wait_semaphore);
+		vk->SetObjectName(VK_OBJECT_TYPE_SEMAPHORE, vk->swapchain_resources[i].wait_semaphore,
+						  fmt::format("new wait_semaphore {}", i).c_str());
+
+		VkFenceCreateInfo fence_ci
+		{
+			.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = VK_FENCE_CREATE_SIGNALED_BIT,
+		};
+
+		vkCreateFence(vk->device, &fence_ci, nullptr, &vk->swapchain_resources[i].acquire_fence);
+		vk->SetObjectName(VK_OBJECT_TYPE_FENCE, vk->swapchain_resources[i].acquire_fence,
+						  fmt::format("new acquire_fence {}", i).c_str());
+
+		vkCreateFence(vk->device, &fence_ci, nullptr, &vk->swapchain_resources[i].present_fence);
+		vk->SetObjectName(VK_OBJECT_TYPE_FENCE, vk->swapchain_resources[i].present_fence,
+						  fmt::format("new present_fence {}", i).c_str());*/
 	}
 
-	vk->current_command_buffer = vk->frames[vk->frame_index].command_buffer;
+	vk->current_command_buffer = vk->frame_resources[vk->frame_index].command_buffer;
 
 	poolInfo.queueFamilyIndex = vk->transfer_family_index;
 	vkCreateCommandPool(vk->device, &poolInfo, nullptr, &vk->transfer_command_pool);
@@ -146,7 +198,7 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 	vkAllocateCommandBuffers(vk->device, &allocInfo, &vk->transfer_command_buffer);
 	vk->SetObjectName(VK_OBJECT_TYPE_COMMAND_BUFFER, vk->transfer_command_buffer, "Transfer Command Buffer");
 
-	VkSemaphoreCreateInfo semaphore_ci
+	/*VkSemaphoreCreateInfo semaphore_ci
 	{
 		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
 		.pNext = nullptr,
@@ -162,7 +214,7 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 		.flags = VK_FENCE_CREATE_SIGNALED_BIT,
 	};
 
-	vkCreateFence(vk->device, &fence_ci, nullptr, &vk->fence);
+	vkCreateFence(vk->device, &fence_ci, nullptr, &vk->fence);*/
 
 	std::vector<VkDescriptorPoolSize> pool_sizes
 	{
@@ -204,7 +256,7 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 		.compareEnable = VK_FALSE,
 		.compareOp = VK_COMPARE_OP_ALWAYS,
 		.minLod = 0.0f,
-		.maxLod = 0.0f,
+		.maxLod = VK_LOD_CLAMP_NONE,
 		.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
 		.unnormalizedCoordinates = VK_FALSE,
 	};
@@ -271,36 +323,22 @@ void RenderDeviceVK::Destroy()
 	vkDestroyCommandPool(vk->device, vk->graphics_command_pool, nullptr);
 	vkDestroyCommandPool(vk->device, vk->transfer_command_pool, nullptr);
 
-	for (uint32_t i = 0; i < vk->frames.size(); i++)
+	for (uint32_t i = 0; i < vk->swapchain_resources.size(); i++)
 	{
 		//vkDestroySemaphore(vk->device, vk->frames[i].swapchain_semaphore, nullptr);
-		vkDestroySemaphore(vk->device, vk->frames[i].render_semaphore, nullptr);
+		vkDestroySemaphore(vk->device, vk->swapchain_resources[i].render_semaphore, nullptr);
 		//vkDestroyFence(vk->device, vk->frames[i].fence, nullptr);
-		vkDestroyImageView(vk->device, vk->frames[i].texture.image_view, nullptr);
+		vkDestroyImageView(vk->device, vk->swapchain_resources[i].texture.image_view, nullptr);
 	}
 
-	/*vkDestroyImageView(vk->device, vk->depth_image_view, nullptr);
-	vkDestroyImage(vk->device, vk->depth_image, nullptr);
-	vkFreeMemory(vk->device, vk->depth_memory, nullptr);*/
-	vkDestroySemaphore(vk->device, vk->swapchain_semaphore, nullptr);
-	vkDestroyFence(vk->device, vk->fence, nullptr);
+
+	//vkDestroySemaphore(vk->device, vk->swapchain_semaphore, nullptr);
+	//vkDestroyFence(vk->device, vk->fence, nullptr);
 
 	for (auto shader: store->shader_modules)
 		vkDestroyShaderModule(vk->device, shader, nullptr);
 
 	vkDestroyDescriptorPool(vk->device, store->descriptor_pool, nullptr);
-
-	//for (auto layout: store->descriptor_layouts)
-	//	vkDestroyDescriptorSetLayout(vk->device, layout, nullptr);
-
-	/*vkDestroySemaphore(vk->device, vk->imageAvailableSemaphore, nullptr);
-	vkDestroySemaphore(vk->device, vk->renderFinishedSemaphore, nullptr);
-	vkDestroyFence(vk->device, vk->inFlightFence, nullptr);
-	vkDestroyImageView(vk->device, vk->image_views[0], nullptr);
-	vkDestroyImageView(vk->device, vk->image_views[1], nullptr);
-	vkDestroyShaderModule(vk->device, store->shaders[0], nullptr);
-	vkDestroyShaderModule(vk->device, store->shaders[1], nullptr);
-	vkDestroyRenderPass(vk->device, vk->render_pass, nullptr);*/
 
 	for (auto &decriptor_set_layout: store->descriptor_set_layouts)
 		vkDestroyDescriptorSetLayout(vk->device, decriptor_set_layout.second, nullptr);
@@ -309,9 +347,6 @@ void RenderDeviceVK::Destroy()
 	{
 		vkDestroyPipeline(vk->device, pipeline.pipeline, nullptr);
 		vkDestroyPipelineLayout(vk->device, pipeline.layout, nullptr);
-
-		//for (auto decriptor_set_layout: pipeline.decriptor_set_layouts)
-		//	vkDestroyDescriptorSetLayout(vk->device, decriptor_set_layout, nullptr);
 	}
 
 	vkDestroySwapchainKHR(vk->device, vk->swapchain, nullptr);
@@ -320,34 +355,6 @@ void RenderDeviceVK::Destroy()
 	vkDestroyInstance(vk->instance, nullptr);
 }
 
-/*Shader RenderDeviceVK::CreateShader(const std::string &name, Shader::Type type, const std::vector<char> &source)
-{
-	auto binary = vk::CompileShader(name, source);
-	ShaderReflectionData reflection_data = vk::GetShaderReflection(type, binary.data(), binary.size());
-
-	VkShaderModuleCreateInfo shader_ci
-	{
-		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-		.pNext = nullptr,
-		.flags = 0,
-		.codeSize = binary.size() * sizeof(uint32_t),
-		.pCode = binary.data(),
-	};
-
-	VkShaderModule module;
-	VkResult result = vkCreateShaderModule(vk->device, &shader_ci, nullptr, &module);
-	if (result != VK_SUCCESS)
-	{
-		Log() << "vkCreateShaderModule failed";
-		return {};
-	}
-
-	vk->SetObjectName(VK_OBJECT_TYPE_SHADER_MODULE, module, name.c_str());
-
-	store->shader_modules.push_back(module);
-	store->shader_reflection[store->shader_modules.size() - 1] = std::move(reflection_data);
-	return Shader(store->shader_modules.size() - 1, type);
-}*/
 
 Shader RenderDeviceVK::LoadShader(Shader::Type type, const std::string &name)
 {
@@ -440,6 +447,11 @@ Shader RenderDeviceVK::LoadShader(Shader::Type type, const std::string &name)
 	return Shader(store->shader_modules.size() - 1, type);
 }
 
+void RenderDeviceVK::LoadMaterialDefinition(const std::string &filename)
+{
+	//
+}
+
 PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const PipelineDesc &desc)
 {
 	vk::Pipeline pipeline;
@@ -447,7 +459,7 @@ PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const Pipelin
 	pipeline.layout = vk::CreatePipelineLayout(vk->device,
 		store->descriptor_set_layouts,
 		{ &store->shader_reflection[desc.shaders[0].handle], &store->shader_reflection[desc.shaders[1].handle] },
-		pipeline.decriptor_set_layouts, 0);
+		pipeline.constant_ranges, pipeline.decriptor_set_layouts, 0);
 
 	//if (name == "deferred/static_meshes")
 	//	std::terminate();
@@ -489,6 +501,7 @@ PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const Pipelin
 
 void RenderDeviceVK::Test()
 {
+	vk::Pipeline pipeline;
 	vk::GraphicsPipelineBuilder builder(vk->device);
 	builder.SetSwapchainFormat(vk->swapchain_format, VK_FORMAT_D24_UNORM_S8_UINT);
 
@@ -504,16 +517,20 @@ void RenderDeviceVK::Test()
 	fs_file.Open();
 	std::vector<uint32_t> fs_binary(fs_file.Size() / 4);
 	fs_file.Read(fs_binary.data(), fs_file.Size());
-	auto fs_reflection = vk::GetShaderReflection("ui_vk_texture_frag.spv", Shader::Type::VERTEX, fs_binary.data(), fs_binary.size());
+	auto fs_reflection = vk::GetShaderReflection("ui_vk_texture_frag.spv", Shader::Type::FRAGMENT, fs_binary.data(), fs_binary.size());
 	std::vector<VkDescriptorSetLayout> fs_decriptor_set_layouts;
 	//VkPipelineLayout fs_layout = vk::CreatePipelineLayout(vk->device, { &fs_reflection }, fs_decriptor_set_layouts);
 
-	VkPipelineLayout vs_layout, fs_layout;
+	VkPipelineLayout vs_layout = vk::CreatePipelineLayout(vk->device, store->descriptor_set_layouts, { &vs_reflection },
+														  pipeline.constant_ranges, pipeline.decriptor_set_layouts, VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
+
+	VkPipelineLayout fs_layout = vk::CreatePipelineLayout(vk->device, store->descriptor_set_layouts, { &fs_reflection },
+														  pipeline.constant_ranges, pipeline.decriptor_set_layouts, VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
 
 	std::array<VkPipeline, 4> stages;
 	stages[0] = builder.CreateVertexInputStage(Vertex::Attrib::POSITION | Vertex::Attrib::TEXCOORD_0, Topology::TRIANGLES);
-	stages[1] = builder.CreateVertexShaderStage("vertex_shader", vs_binary, vs_reflection, &vs_layout);
-	stages[2] = builder.CreateFragmentShaderStage("fragment_shader", fs_binary, fs_reflection, &fs_layout);
+	stages[1] = builder.CreateVertexShaderStage("vertex_shader", vs_binary, vs_layout);
+	stages[2] = builder.CreateFragmentShaderStage("fragment_shader", fs_binary, fs_layout);
 	stages[3] = builder.CreateFragmentOutputStage({});
 
 	VkPipelineLibraryCreateInfoKHR linking_info {};
@@ -522,9 +539,11 @@ void RenderDeviceVK::Test()
 	linking_info.pLibraries   = stages.data();
 
 	std::vector<VkDescriptorSetLayout> decriptor_set_layouts;
+	std::array<vk::ConstantRange, 4> constant_ranges;
 	VkPipelineLayout combined_layout = vk::CreatePipelineLayout(vk->device,
 													store->descriptor_set_layouts,
 													{ &vs_reflection, &fs_reflection },
+													constant_ranges,
 													decriptor_set_layouts, VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
 	vk->SetObjectName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, combined_layout, "combined_layout");
 	vk->SetObjectName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, vs_layout, "vertex_layout");
@@ -534,7 +553,7 @@ void RenderDeviceVK::Test()
 	executable_pipeline_create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	executable_pipeline_create_info.pNext = &linking_info;
 	executable_pipeline_create_info.flags = 0;
-	executable_pipeline_create_info.layout = combined_layout;
+	executable_pipeline_create_info.layout = VK_NULL_HANDLE;
 
 	VkPipeline executable = VK_NULL_HANDLE;
 	vkCreateGraphicsPipelines(vk->device, VK_NULL_HANDLE, 1, &executable_pipeline_create_info, nullptr, &executable);
@@ -555,9 +574,25 @@ void RenderDeviceVK::Draw(uint32_t first, uint32_t count)
 
 void RenderDeviceVK::BeginFrame()
 {
-	vkWaitForFences(vk->device, 1, &vk->fence, VK_TRUE, UINT64_MAX);
+	uint32_t prev_time = times[1] - times[0];
+
+	times[0] = SDL_GetTicks();
+	/*if (prev_time > 30)
+		vkQueueWaitIdle(vk->graphics_queue);
+
+	else*/
+	//vkQueueWaitIdle(vk->graphics_queue);
+	vkWaitForFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence, VK_TRUE, UINT64_MAX);
+	vkResetFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence);
+	//vkQueueWaitIdle(vk->graphics_queue);
+	times[1] = SDL_GetTicks();
+
+	//Log() << "frame" << vk->frame_index;
+
 	VkResult result = vkAcquireNextImageKHR(vk->device, vk->swapchain, UINT64_MAX,
-											vk->swapchain_semaphore, VK_NULL_HANDLE, &vk->image_index);
+											vk->frame_resources[vk->frame_index].present_semaphore,
+											VK_NULL_HANDLE, &vk->image_index);
+	times[2] = SDL_GetTicks();
 
 	//if (result != VK_SUCCESS)
 	//	Log() << result;
@@ -622,7 +657,7 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 	}
 	else
 	{
-		color_image_views.push_back(vk->frames[vk->image_index].texture.image_view);
+		color_image_views.push_back(vk->swapchain_resources[vk->image_index].texture.image_view);
 		//depth_image_view = store->textures.at(vk->depth_texture_fffuuu.handle).image_view;
 		//depth_layout = store->textures.at(vk->depth_texture_fffuuu.handle).layout;
 		depth_image_view = VK_NULL_HANDLE;
@@ -738,20 +773,26 @@ void RenderDeviceVK::EndFrame()
 
 	vkEndCommandBuffer(vk->current_command_buffer);
 
-	VkSubmitInfo submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 
-	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-	submitInfo.waitSemaphoreCount = 1;
-	submitInfo.pWaitSemaphores = &vk->swapchain_semaphore;
-	submitInfo.pWaitDstStageMask = waitStages;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &vk->current_command_buffer;
-	submitInfo.signalSemaphoreCount = 1;
-	submitInfo.pSignalSemaphores = &vk->frames[vk->image_index].render_semaphore;
+	VkSubmitInfo submit_info
+	{
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.pNext = nullptr,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &vk->frame_resources[vk->frame_index].present_semaphore,
+		.pWaitDstStageMask = wait_stages,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &vk->current_command_buffer,
+		.signalSemaphoreCount = 1,
+		.pSignalSemaphores = &vk->swapchain_resources[vk->image_index].render_semaphore,
+	};
 
-	vkResetFences(vk->device, 1, &vk->fence);
-	vkQueueSubmit(vk->graphics_queue, 1, &submitInfo, vk->fence);
+	times[3] = SDL_GetTicks();
+	//vkResetFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence);
+	times[4] = SDL_GetTicks();
+	vkQueueSubmit(vk->graphics_queue, 1, &submit_info, vk->frame_resources[vk->frame_index].fence);
+	times[5] = SDL_GetTicks();
 
 	/*VkSemaphoreSubmitInfo wait_semaphore_submit_info
 	{
@@ -784,7 +825,7 @@ void RenderDeviceVK::EndFrame()
 		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 		.pNext = nullptr,
 		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &vk->frames[vk->image_index].render_semaphore,
+		.pWaitSemaphores = &vk->swapchain_resources[vk->image_index].render_semaphore,
 		.swapchainCount = 1,
 		.pSwapchains = &vk->swapchain,
 		.pImageIndices = &vk->image_index,
@@ -792,9 +833,12 @@ void RenderDeviceVK::EndFrame()
 	};
 
 	vkQueuePresentKHR(vk->graphics_queue, &present_info);
+	times[6] = SDL_GetTicks();
 
-	//vk->frame_index = (vk->frame_index + 1) % vk->frames.size();
-	vk->current_command_buffer = vk->frames[vk->frame_index].command_buffer;
+	vk->frame_index = (vk->frame_index + 1) % vk->frame_resources.size();
+	vk->current_command_buffer = vk->frame_resources[vk->frame_index].command_buffer;
+
+	//Log() << times[1] - times[0] << times[2] - times[1] << times[3] - times[2] << times[4] - times[3] << times[5] - times[4] << times[6] - times[5];
 }
 
 void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLayout to)
@@ -810,7 +854,7 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 
 	if (!texture)
 	{
-		vk_texture = &vk->frames[vk->image_index].texture;
+		vk_texture = &vk->swapchain_resources[vk->image_index].texture;
 	}
 	else
 	{
@@ -1046,6 +1090,9 @@ DescriptorSet RenderDeviceVK::CreateDescriptorSet(PipelineID pipeline, Descripto
 	VkDescriptorSet descriptor_set;
 	vkAllocateDescriptorSets(vk->device, &alloc_info, &descriptor_set);
 
+	vk->SetObjectName(VK_OBJECT_TYPE_DESCRIPTOR_SET, descriptor_set,
+					  fmt::format("fucking set {}", store->descriptor_sets.size()).c_str());
+
 	store->descriptor_sets.push_back(descriptor_set);
 	return { { uint32_t(store->descriptor_sets.size() - 1) } };
 }
@@ -1081,6 +1128,7 @@ void RenderDeviceVK::WriteDescriptor(DescriptorSet set, uint32_t binding, Textur
 	vk::Texture texture = store->textures.at(value.handle);
 	VkImageView image_view = texture.image_view;
 	VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
 	if (Texture::IsDepth(value.format))
 	{
 		VkImageViewCreateInfo image_view_ci
@@ -1138,12 +1186,33 @@ void RenderDeviceVK::BindDescriptorSet(Descriptor2::Set index, DescriptorSet des
 }*/
 
 // TODO: make flags for all(graphics) stages
-void RenderDeviceVK::Push(Shader::Type type, uint32_t offset, int value)
+/*void RenderDeviceVK::Push(Shader::Type type, uint32_t offset, int value)
 {
 	vkCmdPushConstants(vk->current_command_buffer, store->current_pipeline.layout, vk::ConvertEnum(type),
 					offset, sizeof(int), &value);
 	//vkCmdPushConstants(vk->current_command_buffer, store->current_pipeline.layout, VK_SHADER_STAGE_ALL_GRAPHICS,
 	//				   offset, sizeof(int), &value);
+}*/
+
+void RenderDeviceVK::PushConstant(uint32_t slot, int value)
+{
+	vk::ConstantRange &range = store->current_pipeline.constant_ranges.at(slot);
+	if (range.stage_flags == 0 || range.size == 0 || range.size != sizeof(int))
+		throw std::runtime_error("Wrong push constants range");
+
+	vkCmdPushConstants(vk->current_command_buffer, store->current_pipeline.layout, range.stage_flags,
+					range.offset, range.size, &value);
+}
+
+void RenderDeviceVK::PushConstant(uint32_t slot, float value)
+{
+	// TODO: assert range.size == sizeof(float)
+	vk::ConstantRange &range = store->current_pipeline.constant_ranges.at(slot);
+	if (range.stage_flags == 0 || range.size == 0 || range.size != sizeof(float))
+		throw std::runtime_error("Wrong push constants range");
+
+	vkCmdPushConstants(vk->current_command_buffer, store->current_pipeline.layout, range.stage_flags,
+					range.offset, range.size, &value);
 }
 
 /*void RenderDeviceVK::Push(size_t size, size_t offset, void *value)
@@ -1177,7 +1246,7 @@ Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc
 	if (uint32_t(desc.usage & Texture::Usage::DEPTH_ATTACHMENT))
 		usage_flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-	if (desc.pixels != nullptr)
+	if (desc.pixels != nullptr) // FIXME: should it check for not be COLOR_ATTACHMENT?
 		usage_flags |= VK_IMAGE_USAGE_HOST_TRANSFER_BIT;
 
 	VkImageCreateInfo image_ci
@@ -1239,6 +1308,8 @@ Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc
 		.subresourceRange = vk->generic_subresource,
 	};
 
+	image_view_ci.subresourceRange.levelCount = desc.levels;
+
 	if (desc.format == Texture::Format::D24S8)
 	{
 		image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
@@ -1265,45 +1336,53 @@ Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc
 		.subresourceRange = vk->generic_subresource,
 	};
 
+	layout_transition_info.subresourceRange.levelCount = desc.levels;
+
 	vkTransitionImageLayout(vk->device, 1, &layout_transition_info);
 
 	/*uint32_t pixel_size = 4;
 	if (desc.format == Texture::Format::R8)
 		pixel_size = 1;*/
 
-	VkImageSubresourceLayers subresource_layers
+	uint32_t offset = 0;
+	for (uint32_t i = 0; i < desc.levels; i++)
 	{
-		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.mipLevel = 0,
-		.baseArrayLayer = 0,
-		.layerCount = 1,
-	};
+		VkImageSubresourceLayers subresource_layers
+		{
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.mipLevel = i,
+			.baseArrayLayer = 0,
+			.layerCount = 1,
+		};
 
-	VkMemoryToImageCopy image_copy
-	{
-		.sType = VK_STRUCTURE_TYPE_MEMORY_TO_IMAGE_COPY,
-		.pNext = nullptr,
-		.pHostPointer = desc.pixels,
-		.memoryRowLength = 0,
-		.memoryImageHeight = 0,
-		.imageSubresource = subresource_layers,
-		.imageOffset = {},
-		.imageExtent = { desc.width, desc.height, 1 },
-	};
+		VkMemoryToImageCopy image_copy
+		{
+			.sType = VK_STRUCTURE_TYPE_MEMORY_TO_IMAGE_COPY,
+			.pNext = nullptr,
+			.pHostPointer = (char *)desc.pixels + offset,
+			.memoryRowLength = 0,
+			.memoryImageHeight = 0,
+			.imageSubresource = subresource_layers,
+			.imageOffset = {},
+			.imageExtent = { desc.width >> i, desc.height >> i, 1 },
+		};
 
-	VkCopyMemoryToImageInfo copy_info
-	{
-		.sType = VK_STRUCTURE_TYPE_COPY_MEMORY_TO_IMAGE_INFO,
-		.pNext = nullptr,
-		.flags = 0,
-		.dstImage = image,
-		.dstImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		.regionCount = 1,
-		.pRegions = &image_copy,
-	};
+		VkCopyMemoryToImageInfo copy_info
+		{
+			.sType = VK_STRUCTURE_TYPE_COPY_MEMORY_TO_IMAGE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.dstImage = image,
+			.dstImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			.regionCount = 1,
+			.pRegions = &image_copy,
+		};
 
-	vkCopyMemoryToImage(vk->device, &copy_info);
-	//vkDeviceWaitIdle(vk->device);
+		vkCopyMemoryToImage(vk->device, &copy_info);
+		//vkDeviceWaitIdle(vk->device);
+
+		offset += (desc.width >> i) * (desc.height >> i) * 4; // TODO: get format pixel size
+	}
 
 	// ------------------------------------------------------------------------------------------
 
@@ -1321,33 +1400,16 @@ FramebufferID RenderDeviceVK::CreateFramebuffer(const FramebufferDesc &desc)
 	framebuffer.color_textures.resize(desc.color_textures.size());
 	framebuffer.color_formats.resize(desc.color_textures.size());
 
-	/*TextureDesc texture_desc
-	{
-		.width  = desc.width,
-		.height = desc.height,
-		.format = desc.color_format,
-		.usage  = Texture::Usage::COLOR_ATTACHMENT | Texture::Usage::SHADER_READ,
-		.levels = 1,
-		.pixels = nullptr,
-	};*/
-
 	for (uint32_t i = 0; i < desc.color_textures.size(); i++)
 	{
-		//framebuffer.color_textures[i] = CreateTexture(texture_desc, false);
+
 		framebuffer.color_textures[i] = desc.color_textures[i],
 		framebuffer.color_formats[i] = desc.color_textures[i].format;
-		//SetDebugName(framebuffer.color_textures[i], "Color Render Target"); // TODO: better name
 	}
 
-	//texture_desc.format = desc.depth_format;
-	//texture_desc.usage = Texture::Usage::DEPTH_ATTACHMENT | Texture::Usage::SHADER_READ;
-
-	//Texture depth_texture = CreateTexture(texture_desc, false);
-	//framebuffer.depth_texture = CreateTexture(texture_desc, false);
 	framebuffer.depth_texture = desc.depth_texture;
-	//SetDebugName(framebuffer.depth_texture, "Depth Render Target");
 
-	store->framebuffers.push_back(framebuffer);
+	store->framebuffers.push_back(framebuffer);	
 	return { uint32_t(store->framebuffers.size() - 1) };
 }
 

@@ -102,9 +102,9 @@ void PointLightRenderPath::Render()
 	device->BindDescriptorSet(Descriptor2::Set::MATERIAL, material_set);
 
 	device->BindVertexBuffer(sphere_vbo);
-	device->Push(Shader::Type::VERTEX, 0, 0);
-	//device->Push(Shader::Type::VERTEX, 4, 0);
-	device->Push(Shader::Type::FRAGMENT, 4, 0);
+	//device->Push(Shader::Type::VERTEX, 0, 0);
+	//device->Push(Shader::Type::FRAGMENT, 4, 0);
+	device->PushConstant(0, 0);
 	device->Draw(0, sphere_vertex_count);
 
 	//device->EndRenderPass({});

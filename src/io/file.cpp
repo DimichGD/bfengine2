@@ -88,7 +88,7 @@ bool File::Open(Access access)
 	if (access == Access::READ && !std::filesystem::exists(name))
 	{
 		// TODO: do not write to log if not exists, write in caller side. or provide static exists function
-		Log("File::Open") << "File" << name << "not found";
+		Warn() << "File" << name << "not found";
 		return false;
 	}
 

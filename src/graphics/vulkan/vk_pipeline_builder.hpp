@@ -21,9 +21,9 @@ public:
 
 	VkPipeline CreateVertexInputStage(Vertex::Attrib vertex_attribs, Topology topology);
 	VkPipeline CreateVertexShaderStage(const std::string &name,
-						std::span<const uint32_t> binary, ShaderReflectionData reflection_data, VkPipelineLayout *out);
+									   std::span<const uint32_t> binary, VkPipelineLayout layout);
 	VkPipeline CreateFragmentShaderStage(const std::string &name,
-						std::span<const uint32_t> binary, ShaderReflectionData reflection_data, VkPipelineLayout *out);
+						std::span<const uint32_t> binary, VkPipelineLayout layout);
 	VkPipeline CreateFragmentOutputStage(Raster raster_state);
 
 	VkPipeline Build(VkDevice device, VkPipelineCache pipeline_cache);

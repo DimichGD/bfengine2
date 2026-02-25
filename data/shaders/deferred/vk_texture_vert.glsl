@@ -23,9 +23,9 @@ layout(push_constant) uniform Constants
 };
 
 layout(location = 0) out vec2 TEXCOORD_0;
-layout(location = 2) out vec3 NORMAL;
-layout(location = 3) out vec3 BINORMAL;
-layout(location = 4) out vec3 TANGENT;
+layout(location = 1) out vec3 NORMAL;
+layout(location = 2) out vec3 BINORMAL;
+layout(location = 3) out vec3 TANGENT;
 
 void main()
 {

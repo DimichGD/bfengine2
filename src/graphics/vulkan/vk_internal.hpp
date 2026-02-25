@@ -1,6 +1,6 @@
 #pragma once
 #include "core/defines.hpp"
-#include "graphics/vulkan/render_device_vk.hpp"
+#include "graphics/vulkan/vk_render_device.hpp"
 #include <SDL3/SDL_video.h>
 #include <vulkan/vulkan.h>
 #include <vector>
@@ -22,11 +22,19 @@ struct Texture
 	VkImageLayout layout;
 };
 
+struct ConstantRange
+{
+	VkShaderStageFlags stage_flags;
+	uint32_t offset = 0;
+	uint32_t size = 0;
+};
+
 struct Pipeline
 {
 	VkPipeline pipeline;
 	VkPipelineLayout layout;
 	std::vector<VkDescriptorSetLayout> decriptor_set_layouts;
+	std::array<ConstantRange, 4> constant_ranges {};
 };
 
 BF_END_VK_NAMESPACE
@@ -37,7 +45,20 @@ struct SwapchainResource
 	//VkImageView image_view = VK_NULL_HANDLE;
 	vk::Texture texture {};
 	VkSemaphore render_semaphore = VK_NULL_HANDLE;
+
+	/*VkFence acquire_fence = VK_NULL_HANDLE;
+	VkFence present_fence = VK_NULL_HANDLE;
+	VkSemaphore acquire_semaphore  = VK_NULL_HANDLE;
+	VkSemaphore wait_semaphore = VK_NULL_HANDLE;*/
+};
+
+struct FrameResource
+{
+	VkFence fence = VK_NULL_HANDLE;
+	VkSemaphore present_semaphore = VK_NULL_HANDLE;
 	VkCommandBuffer command_buffer = VK_NULL_HANDLE;
+
+	//VkSemaphore render_semaphore = VK_NULL_HANDLE;
 };
 
 enum class MemoryType
@@ -81,7 +102,8 @@ struct RenderDeviceVK::Internal
 
 	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 	VkFormat swapchain_format = VK_FORMAT_UNDEFINED;
-	std::vector<SwapchainResource> frames;
+	std::vector<SwapchainResource> swapchain_resources;
+	std::vector<FrameResource> frame_resources;
 	/*VkImage depth_image = VK_NULL_HANDLE;
 	VkDeviceMemory depth_memory = VK_NULL_HANDLE;
 	VkImageView depth_image_view = VK_NULL_HANDLE;*/
@@ -89,8 +111,8 @@ struct RenderDeviceVK::Internal
 	//bf::Texture depth_texture_fffuuu {};
 	VkClearColorValue clear_color;
 	VkClearDepthStencilValue clear_depth_stencil;
-	VkSemaphore swapchain_semaphore = VK_NULL_HANDLE;
-	VkFence fence = VK_NULL_HANDLE;
+	//VkSemaphore swapchain_semaphore = VK_NULL_HANDLE;
+	//VkFence fence = VK_NULL_HANDLE;
 
 	VkImageSubresourceRange generic_subresource
 	{

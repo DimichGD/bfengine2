@@ -1,7 +1,7 @@
 #include "vk_internal.hpp"
 #include "core/log.hpp"
-#include "enumerate_stuff_vk.hpp"
-#include "graphics/vulkan/convert_enum_vk.hpp"
+#include "vk_enumerate_stuff.hpp"
+#include "graphics/vulkan/vk_convert_enum.hpp"
 #include <fmt/format.h>
 #include <vector>
 #include <string>
@@ -233,6 +233,7 @@ void RenderDeviceVK::Internal::CreateDevice()
 	VkPhysicalDeviceFeatures2 phys_device_features {};
 	phys_device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 	phys_device_features.pNext = &device_features_1_3;
+	//phys_device_features.features.samplerAnisotropy = VK_TRUE;
 	//phys_device_features.features.shaderUniformBufferArrayDynamicIndexing = VK_TRUE;
 	//phys_device_features.features.multiDrawIndirect = VK_TRUE;
 
@@ -264,6 +265,8 @@ void RenderDeviceVK::Internal::CreateSwapchain()
 	vkGetPhysicalDeviceSurfacePresentModesKHR(phys_device, surface, &count, nullptr);
 	std::vector<VkPresentModeKHR> present_modes(count);
 	vkGetPhysicalDeviceSurfacePresentModesKHR(phys_device, surface, &count, present_modes.data());
+	//for (const VkPresentModeKHR &mode: present_modes)
+	//	Log() << mode;
 	// TODO: do something with this
 
 	VkSwapchainCreateInfoKHR swapchain_ci =
@@ -272,7 +275,7 @@ void RenderDeviceVK::Internal::CreateSwapchain()
 		.pNext = nullptr,
 		.flags = 0,
 		.surface = surface,
-		.minImageCount = 2,
+		.minImageCount = 3,
 		.imageFormat = swapchain_format,
 		.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
 		.imageExtent = { width, height },
@@ -283,7 +286,7 @@ void RenderDeviceVK::Internal::CreateSwapchain()
 		.pQueueFamilyIndices = nullptr,
 		.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
 		.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-		.presentMode = VK_PRESENT_MODE_FIFO_KHR,
+		.presentMode = VK_PRESENT_MODE_FIFO_KHR, //VK_PRESENT_MODE_FIFO_KHR,
 		.clipped = VK_TRUE,
 		.oldSwapchain = swapchain,
 	};
@@ -296,15 +299,15 @@ void RenderDeviceVK::Internal::CreateSwapchain()
 	vkGetSwapchainImagesKHR(device, swapchain, &count, nullptr);
 	//Log() << count << "images";
 
-	frames.resize(count);
+	swapchain_resources.resize(count);
 
 	std::vector<VkImage> swapchain_images(count);
 	vkGetSwapchainImagesKHR(device, swapchain, &count, swapchain_images.data());
 
 	for (uint32_t i = 0; i < count; i++)
 	{
-		frames[i].texture.image = swapchain_images[i];
-		SetObjectName(VK_OBJECT_TYPE_IMAGE, frames[i].texture.image, fmt::format("Swapchain Image {}", i).c_str());
+		swapchain_resources[i].texture.image = swapchain_images[i];
+		SetObjectName(VK_OBJECT_TYPE_IMAGE, swapchain_resources[i].texture.image, fmt::format("Swapchain Image {}", i).c_str());
 	}
 
 	VkComponentMapping mapping =
@@ -315,21 +318,21 @@ void RenderDeviceVK::Internal::CreateSwapchain()
 		.a = VK_COMPONENT_SWIZZLE_IDENTITY
 	};
 
-	for (uint32_t i = 0; i < frames.size(); i++)
+	for (uint32_t i = 0; i < swapchain_resources.size(); i++)
 	{
 		VkImageViewCreateInfo image_view_ci =
 		{
 			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 			.pNext = nullptr,
 			.flags = 0,
-			.image = frames[i].texture.image,
+			.image = swapchain_resources[i].texture.image,
 			.viewType = VK_IMAGE_VIEW_TYPE_2D,
 			.format = swapchain_format,
 			.components = mapping,
 			.subresourceRange = generic_subresource,
 		};
 
-		VkResult result = vkCreateImageView(device, &image_view_ci, nullptr, &frames[i].texture.image_view);
+		VkResult result = vkCreateImageView(device, &image_view_ci, nullptr, &swapchain_resources[i].texture.image_view);
 		if (result != VK_SUCCESS)
 			throw std::runtime_error("vkCreateImageView failed");
 	}

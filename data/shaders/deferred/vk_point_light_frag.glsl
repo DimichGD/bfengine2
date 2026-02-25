@@ -6,12 +6,12 @@ layout(std140, set = 0, binding = 2) uniform Lights
 	vec4 U_POINT_LIGHTS[1];
 };
 
-layout(std140, set = 0, binding = 3) uniform Camera
+layout(std140, set = 0, binding = 3) uniform CameraData
 {
 	mat4 U_INV_PROJ_MATRIX;
 	mat4 U_INV_VIEW_MATRIX;
 	vec4 U_CAMERA_POS;
-	vec2 inv_viewport;
+	//vec2 U_INV_VIEWPORT_SIZE;
 };
 
 layout(set = 1, binding = 0) uniform sampler2D diffuse_map;
@@ -21,16 +21,17 @@ layout(set = 1, binding = 3) uniform sampler2D depth_map;
 
 layout(push_constant) uniform Constants
 {
-	//layout(offset = 0) int U_OBJECT_INDEX;
-	layout(offset = 4) int U_MATERIAL_INDEX;
+	layout(offset = 0) int U_MATERIAL_INDEX;
 };
 
+layout(location = 0) in vec2 POSITION;
 layout(location = 0) out vec4 OUT_COLOR;
 
 void main()
 {
 	vec4 ndc = vec4(
-		gl_FragCoord.xy * inv_viewport * 2.0 - 1.0,
+		POSITION,
+		//gl_FragCoord.xy * U_INV_VIEWPORT_SIZE * 2.0 - 1.0,
 		texelFetch(depth_map, ivec2(gl_FragCoord.xy), 0).r,
 		1.0
 	);
@@ -62,5 +63,5 @@ void main()
 	OUT_COLOR = att * vec4(diffuse * D + specular * S, 1.0);
 	//OUT_COLOR = vec4(1.0, 0.0, 0.0, 1.0);
 	//OUT_COLOR = vec4(gl_FragCoord.xy / vec2(1280.0, 720.0) * 2.0 - 1.0, 0.0, 1.0);
-	//OUT_COLOR = vec4(world_pos, 1.0);
+	//OUT_COLOR = vec4(normal, 1.0);
 }

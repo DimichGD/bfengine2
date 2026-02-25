@@ -1,6 +1,7 @@
 #pragma once
 #include "core/defines.hpp"
 #include "graphics/types.hpp"
+#include "graphics/vulkan/vk_internal.hpp"
 #include <vulkan/vulkan_core.h>
 
 BF_BEGIN_NAMESPACE
@@ -11,6 +12,7 @@ std::vector<uint32_t> CompileShader(const std::string &name, const std::vector<c
 VkPipelineLayout CreatePipelineLayout(VkDevice device,
 									  std::map<uint32_t, VkDescriptorSetLayout> &global_descriptor_set_layouts,
 									  const std::vector<ShaderReflectionData *> &reflection_data,
+									  std::array<ConstantRange, 4> &constant_ranges,
 									  std::vector<VkDescriptorSetLayout> &decriptor_set_layouts,
 									  VkPipelineLayoutCreateFlags flags);
 

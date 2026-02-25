@@ -24,7 +24,8 @@ layout(binding = 3) uniform sampler2D depth_map;
 	layout(offset = 4) int U_MATERIAL_INDEX;
 };*/
 
-layout(location = 1) uniform int U_MATERIAL_INDEX;
+layout(location = 0) uniform int U_OBJECT_INDEX;
+//layout(location = 1) uniform int U_MATERIAL_INDEX;
 
 layout(location = 0) out vec4 OUT_COLOR;
 
@@ -43,8 +44,8 @@ void main()
 	vec3 normal = texelFetch(normal_map, ivec2(gl_FragCoord.xy), 0).xyz;
 	vec3 specular = texelFetch(specular_map, ivec2(gl_FragCoord.xy), 0).xyz;
 	
-	vec3 light_pos = U_POINT_LIGHTS[U_MATERIAL_INDEX].xyz;
-	float radius = U_POINT_LIGHTS[U_MATERIAL_INDEX].w;
+	vec3 light_pos = U_POINT_LIGHTS[U_OBJECT_INDEX].xyz;
+	float radius = U_POINT_LIGHTS[U_OBJECT_INDEX].w;
 	
 	vec3 L = normalize(light_pos - world_pos);
 	//vec3 N = normalize(normal * 2.0 - vec3(1.0));

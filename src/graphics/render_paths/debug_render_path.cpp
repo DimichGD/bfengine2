@@ -78,10 +78,12 @@ void Debug::Render(std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2)
 	for (auto &mesh: meshes)
 	{
 		device->BindVertexBuffer(mesh.vbo);
-		device->Push(Shader::Type::VERTEX, 0, mesh.matrix_index);
+		//device->Push(Shader::Type::VERTEX, 0, mesh.matrix_index);
+		device->PushConstant(0, int(mesh.matrix_index));
 		for (auto &surf: mesh.surfaces)
 		{
-			device->Push(Shader::Type::FRAGMENT, 4, surf.material_index);
+			//device->Push(Shader::Type::FRAGMENT, 4, surf.material_index);
+			device->PushConstant(1, int(surf.material_index));
 			//materials.at(surf.texture_index).Bind(device);
 			//if (!surf.material->Ready())
 			//	surf.material->Setup(device, device->CreateDescriptorSet(pipeline_lines, Descriptor2::Set::MATERIAL));
@@ -98,7 +100,8 @@ void Debug::Render(std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2)
 	for (auto &mesh: meshes2)
 	{
 		device->BindVertexBuffer(mesh.vbo);
-		device->Push(Shader::Type::VERTEX, 0, mesh.matrix_index);
+		//device->Push(Shader::Type::VERTEX, 0, mesh.matrix_index);
+		device->PushConstant(0, int(mesh.matrix_index));
 		for (auto &surf: mesh.surfaces)
 		{
 			//device->Push(Shader::Type::FRAGMENT, 4, 0);

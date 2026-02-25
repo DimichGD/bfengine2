@@ -26,6 +26,7 @@ public:
 
 	//Shader CreateShader(const std::string &name, Shader::Type type, const std::vector<char> &source);
 	Shader LoadShader(Shader::Type type, const std::string &name) override;
+	void LoadMaterialDefinition(const std::string &filename);
 	PipelineID CreatePipeline(const std::string &name, const PipelineDesc &desc) override;
 	void Test();
 	//void CreatePipelineLayout(const std::map<Descriptor::Set, std::vector<Descriptor>> &descriptors);
@@ -70,7 +71,9 @@ public:
 	void WriteDescriptor(DescriptorSet set, uint32_t binding, Texture value, uint32_t index = 0) override;
 	void BindDescriptorSet(Descriptor2::Set index, DescriptorSet descriptor_set) override; // TODO: rename index
 	//void Push(Shader::Type type, uint32_t offset, glm::vec4 value);
-	void Push(Shader::Type type, uint32_t offset, int value) override;
+	//void Push(Shader::Type type, uint32_t offset, int value) override;
+	void PushConstant(uint32_t slot, int value) override;
+	void PushConstant(uint32_t slot, float value) override;
 	//void Push(size_t size, size_t offset, void *value);
 	/*void SetUniform1i(int value);
 	void SetUniform2i(std::array<int, 2> values);*/
@@ -93,11 +96,11 @@ private:
 	struct Storage;
 	Storage *store = nullptr;
 
+	uint32_t times[32] {};
+
 	//std::map<Handle, TrackedResource> tracked_resources;
 	//std::vector<ImageLayout> swapchain_image_prev_layouts;
 	//std::vector<Texture> swapchain_textures;
-
-	// RenderDevice interface
 };
 
 BF_END_NAMESPACE

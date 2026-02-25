@@ -54,7 +54,8 @@ void Deferred::Render(std::vector<Mesh> &meshes)
 		device->BindVertexBuffer(mesh.vbo);
 		for (auto &surf: mesh.surfaces)
 		{
-			device->Push(Shader::Type::VERTEX, 0, mesh.matrix_index);
+			//device->Push(Shader::Type::VERTEX, 0, mesh.matrix_index);
+			device->PushConstant(0, int(mesh.matrix_index));
 			//device->Push(Shader::Type::FRAGMENT, 4, surf.texture_index);
 			//materials.at(surf.texture_index).Bind(device);
 			//if (!surf.material->Ready())
@@ -62,7 +63,8 @@ void Deferred::Render(std::vector<Mesh> &meshes)
 			if (!surf.descriptor_set)
 			{
 				surf.descriptor_set = device->CreateDescriptorSet(pipeline, Descriptor2::Set::MATERIAL);
-				surf.material->Setup(device, surf.descriptor_set);
+				//surf.material->Setup(device, surf.descriptor_set);
+				std::static_pointer_cast<CustomMaterial>(surf.material)->Setup2(device, context, Descriptor2::Set::MATERIAL, surf.descriptor_set);
 			}
 
 			//surf.material->Bind(device);

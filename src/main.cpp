@@ -4,7 +4,7 @@
 #include "graphics/opengl/render_device_gl.hpp"
 #include "graphics/render_paths/debug_render_path.hpp"
 #include "graphics/render_paths/point_light_render_path.hpp"
-#include "graphics/vulkan/render_device_vk.hpp"
+#include "graphics/vulkan/vk_render_device.hpp"
 #include "graphics/render_paths/deferred_render_path.hpp"
 #include "io/file.hpp"
 #include "math/matrix.hpp"
@@ -52,16 +52,17 @@ int main()
 	const char *flip_shader_name = config.render.api == Config::Render::API::VK ? "vk_flip" : "gl_flip";
 	const char *ui_texture_shader_name = config.render.api == Config::Render::API::VK ? "ui/vk_texture" : "ui/gl_texture";
 
-	RenderDevice *device = nullptr;
-	switch (config.render.api)
+	RenderDeviceVK *device = new RenderDeviceVK(&config, &fs);
+	/*switch (config.render.api)
 	{
 		case Config::Render::API::VK: device = new RenderDeviceVK(&config, &fs); break;
 		case Config::Render::API::GL: device = new RenderDeviceGL(&config, &fs); break;
-	}
+	}*/
 
 	device->Create(wnd.WindowHandle());
 
 	ResourceManager resources(device, &fs);
+	//resources.LoadKTX2("wall/gotbwall4_d.ktx2");
 
 	TextureDesc color_desc
 	{
@@ -234,7 +235,7 @@ int main()
 		glm::mat4 inv_proj;
 		glm::mat4 inv_view;
 		glm::vec4 camera_pos;
-		glm::vec2 inv_viewport;
+		//glm::vec2 inv_viewport;
 	};
 
 	std::vector<glm::vec4> point_lights
@@ -284,7 +285,7 @@ int main()
 	uint32_t max_time = 0;
 
 	//device->Test();
-	Mesh grid_mesh { { { { 0, uint32_t(grid_verts.size()) }, nullptr, 3 } }, grid_vbo, 1 };
+	Mesh grid_mesh { "grid_mesh", { { { 0, uint32_t(grid_verts.size()) }, nullptr, 3 } }, grid_vbo, 1 };
 	std::vector<Mesh> meshes2;
 	meshes2.push_back(grid_mesh);
 
@@ -309,11 +310,12 @@ int main()
 	//device->UpdateBuffer(editing_vbo, sizeof(NormalMappedVertex) * 6 * walls.size(), walls.data(), 0);
 	// next 2 lines is working
 	Surface wall_surf { { 0, 6 * uint32_t(walls.size()) }, resources.LoadMaterial("wall/gotbwall4"), 0, device->CreateDescriptorSet(deferred.pipeline, Descriptor2::Set::MATERIAL) };
-	wall_surf.material->Setup(device, wall_surf.descriptor_set);
+	//wall_surf.material->Setup(device, wall_surf.descriptor_set);
+	std::static_pointer_cast<CustomMaterial>(wall_surf.material)->Setup2(device, &graphics_context, Descriptor2::Set::MATERIAL, wall_surf.descriptor_set);
 
 	uint32_t editing_wall_index = 0;
 
-	bool capture_mouse = true;
+	bool capture_mouse = false;
 	wnd.CaptureMouse(capture_mouse);
 	Input input;
 	while (wnd.Update(input))
@@ -420,7 +422,7 @@ int main()
 			.inv_proj = glm::inverse(proj),
 			.inv_view = glm::inverse(view),
 			.camera_pos = glm::vec4(view_transform.pos, 1.0f),
-			.inv_viewport = glm::vec2(1.0f / float(config.window.width), 1.0f / float(config.window.height)),
+			//.inv_viewport = glm::vec2(1.0f / float(config.window.width), 1.0f / float(config.window.height)),
 		};
 
 		device->UpdateBuffer(camera_pos_ubo, sizeof(PointLightCameraData), &point_light_camera_data, 0);
@@ -434,8 +436,8 @@ int main()
 		}
 		else
 		{
-			glm::vec3 win_coords = glm::vec3(input.MousePos().x, height - input.MousePos().y, 1.0f); // OpenGL
-			//glm::vec3 win_coords = glm::vec3(input.MousePos().x, input.MousePos().y, 1.0f); // Vulkan
+			//glm::vec3 win_coords = glm::vec3(input.MousePos().x, height - input.MousePos().y, 1.0f); // OpenGL
+			glm::vec3 win_coords = glm::vec3(input.MousePos().x, input.MousePos().y, 1.0f); // Vulkan
 			glm::vec4 viewport = glm::vec4(0.0f, 0.0f, width, height);
 			glm::vec3 result = glm::unProject(win_coords, view, proj, viewport);
 			dir = glm::normalize(result - view_transform.pos);
@@ -471,13 +473,11 @@ int main()
 
 		device->BeginRenderPass(gbuffer, RenderPass::Clear::COLOR_DEPTH);
 		deferred.Render(meshes);
-		/*device->BindPipeline(deferred.pipeline);
-		device->BindDescriptorSet(Descriptor2::Set::SCENE, deferred.scene_set);
-		device->Push(Shader::Type::VERTEX, 0, 0);*/
 
 		device->BindVertexBuffer(editing_vbo);
 		device->BindDescriptorSet(Descriptor2::Set::MATERIAL, wall_surf.descriptor_set);
-		device->Push(Shader::Type::VERTEX, 0, 0);
+		//device->Push(Shader::Type::VERTEX, 0, 0);
+		device->PushConstant(0, 0);
 		device->Draw(wall_surf.vertex_range.start, wall_surf.vertex_range.count);
 
 		device->EndRenderPass(gbuffer);
@@ -511,7 +511,8 @@ int main()
 		device->BindPipeline(pipeline_ui);
 		device->BindDescriptorSet(Descriptor2::Set::SCENE, ui_scene_set);
 		device->BindDescriptorSet(Descriptor2::Set::MATERIAL, ui_material_set);
-		device->Push(Shader::Type::FRAGMENT, 4, 3);
+		//device->Push(Shader::Type::FRAGMENT, 4, 3);
+		device->PushConstant(0, 3); // slot index is 0 for fragment shader, do something about it?
 
 		std::span<float> text_verts = device->MapBuffer<float>(text_vbo);
 		//text_string = fmt::format("{} {} {} {}", view_transform.rot.x, view_transform.rot.y, view_transform.rot.z, view_transform.rot.w);
@@ -525,12 +526,13 @@ int main()
 		device->EndRenderPass({});
 
 		device->LayoutTransition({}, ImageLayout::COLOR_ATTACHMENT, ImageLayout::PRESENT);
+		//device->LayoutTransition({}, ImageLayout::UNDEFINED, ImageLayout::PRESENT);
 		device->EndFrame();
 		wnd.Swap();
 
 		//SDL_Delay(1);
 		end_time = SDL_GetTicks();
-		if (end_time - start_time > 17) max_time++;
+		if (end_time - start_time > 18) max_time++;
 		text_string = fmt::format("frame_time = {}, max_time_count = {}", end_time - start_time, max_time);
 		//if (input.KeyPressed(SDL_SCANCODE_E)) max_time = 0;
 	}
