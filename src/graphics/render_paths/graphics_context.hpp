@@ -9,7 +9,16 @@ struct GraphicsContext
 	GPUBuffer model_matrices_ubo {};
 	GPUBuffer colors_ubo {};
 	GPUBuffer point_lights_ubo {};
-	GPUBuffer camera_pos_ubo {};
+	GPUBuffer camera_light_data {};
+
+	std::vector<Texture> gbuffer_textures {};
+	Texture gbuffer_depth {};
+	FramebufferID gbuffer {};
+
+	Texture final_texture {};
+	FramebufferID final_fbo {};
+
+	GPUBuffer text_vbo {};
 };
 
 BF_END_NAMESPACE

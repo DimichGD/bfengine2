@@ -11,9 +11,9 @@ Debug::Debug(RenderDevice *device, Config *config, ResourceManager *resources)
 	this->height = config->window.height;
 }
 
-void Debug::Create(GraphicsContext *context, FramebufferID out_fbo)
+void Debug::Create(std::vector<GraphicsContext> &context, FramebufferID out_fbo)
 {
-	this->context = context;
+	//this->context = context;
 	const char *forward_line_shader_name = config->render.api == Config::Render::API::VK ? "forward/vk_line" : "forward/gl_line";
 	const char *forward_texture_shader_name = config->render.api == Config::Render::API::VK ? "forward/vk_texture" : "forward/gl_texture";
 
@@ -51,15 +51,18 @@ void Debug::Create(GraphicsContext *context, FramebufferID out_fbo)
 	pipeline_lines = device->CreatePipeline("debug/colored_lines", pipeline_line_desc);
 	pipeline_meshes = device->CreatePipeline("debug/textured_meshes", pipeline_mesh_desc);
 
-	scene_set_lines = device->CreateDescriptorSet(pipeline_lines, Descriptor2::Set::SCENE);
-	scene_set_meshes = device->CreateDescriptorSet(pipeline_meshes, Descriptor2::Set::SCENE);
+	for (uint32_t i = 0; i < 3; i++)
+	{
+		scene_set_lines[i] = device->CreateDescriptorSet(pipeline_lines, Descriptor2::Set::SCENE);
+		scene_set_meshes[i] = device->CreateDescriptorSet(pipeline_meshes, Descriptor2::Set::SCENE);
 
-	device->WriteDescriptor(scene_set_lines, 0, context->active_camera_ubo);
-	device->WriteDescriptor(scene_set_lines, 1, context->model_matrices_ubo);
-	device->WriteDescriptor(scene_set_lines, 2, context->colors_ubo);
+		device->WriteDescriptor(scene_set_lines[i], 0, context[i].active_camera_ubo);
+		device->WriteDescriptor(scene_set_lines[i], 1, context[i].model_matrices_ubo);
+		device->WriteDescriptor(scene_set_lines[i], 2, context[i].colors_ubo);
 
-	device->WriteDescriptor(scene_set_meshes, 0, context->active_camera_ubo);
-	device->WriteDescriptor(scene_set_meshes, 1, context->model_matrices_ubo);
+		device->WriteDescriptor(scene_set_meshes[i], 0, context[i].active_camera_ubo);
+		device->WriteDescriptor(scene_set_meshes[i], 1, context[i].model_matrices_ubo);
+	}
 }
 
 void Debug::Destroy()
@@ -67,12 +70,12 @@ void Debug::Destroy()
 	//
 }
 
-void Debug::Render(std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2)
+void Debug::Render(std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2, uint32_t current_index)
 {
 	//device->BeginRenderPass({}, RenderPass::Clear::COLOR);
 
 	device->BindPipeline(pipeline_lines);
-	device->BindDescriptorSet(Descriptor2::Set::SCENE, scene_set_lines);
+	device->BindDescriptorSet(Descriptor2::Set::SCENE, scene_set_lines[current_index]);
 	//device->BindDescriptorSet(Descriptor2::Set::MATERIAL, context->material_set);
 
 	for (auto &mesh: meshes)
@@ -95,7 +98,7 @@ void Debug::Render(std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2)
 	}
 
 	device->BindPipeline(pipeline_meshes);
-	device->BindDescriptorSet(Descriptor2::Set::SCENE, scene_set_meshes);
+	device->BindDescriptorSet(Descriptor2::Set::SCENE, scene_set_meshes[current_index]);
 
 	for (auto &mesh: meshes2)
 	{

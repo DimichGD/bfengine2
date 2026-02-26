@@ -6,8 +6,11 @@ BF_BEGIN_NAMESPACE
 class Parser
 {
 public:
-	Parser(Lexer &lexer);
+	Parser(Lexer *lexer);
+	void DoStuff();
 
+private:
+	Lexer *lexer = nullptr;
 };
 
 BF_END_NAMESPACE

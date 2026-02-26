@@ -45,6 +45,7 @@ struct SwapchainResource
 	//VkImageView image_view = VK_NULL_HANDLE;
 	vk::Texture texture {};
 	VkSemaphore render_semaphore = VK_NULL_HANDLE;
+	VkFence fence = VK_NULL_HANDLE;
 
 	/*VkFence acquire_fence = VK_NULL_HANDLE;
 	VkFence present_fence = VK_NULL_HANDLE;

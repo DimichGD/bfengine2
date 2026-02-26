@@ -14,3 +14,24 @@ definition doom_static
 		constant OBJECT_INDEX
 	}
 }
+
+definition point_light_phong
+{
+	fragment_shader "deferred/vk_point_light"
+	{
+		attachment diffuse_map rgba
+		attachment normal_map rgba
+		attachment specular_map rgba
+		attachment depth_map d24s8
+		buffer POINT_LIGHTS
+		buffer LIGHT_CAMERA_DATA
+		constant MATERIAL_INDEX
+	}
+	
+	vertex_shader "deferred/vk_point_light"
+	{
+		buffer CAMERA_MATRICES
+		buffer MODEL_MATRICES
+		constant OBJECT_INDEX
+	}
+}

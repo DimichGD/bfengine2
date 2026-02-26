@@ -114,9 +114,8 @@ public:
 
 	void Setup2(RenderDevice *device, GraphicsContext *context, Descriptor2::Set set_index, DescriptorSet descriptor_set) override
 	{
-		device->WriteDescriptor(descriptor_set, 0, textures.at(0));
-		device->WriteDescriptor(descriptor_set, 1, textures.at(1));
-		device->WriteDescriptor(descriptor_set, 2, textures.at(2));
+		for (uint32_t i = 0; i < def->textures.size(); i++)
+			device->WriteDescriptor(descriptor_set, i, textures.at(i));
 
 		/*switch (set_index)
 		{

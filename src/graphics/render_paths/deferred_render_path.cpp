@@ -12,9 +12,9 @@ Deferred::Deferred(RenderDevice *device, Config *config, ResourceManager *resour
 	this->height = config->window.height;
 }
 
-void Deferred::Create(GraphicsContext *context, FramebufferID out_fbo)
+void Deferred::Create(std::vector<GraphicsContext> &context, FramebufferID out_fbo)
 {
-	this->context = context;
+	//this->context = context;
 	const char *deferred_texture_shader_name = config->render.api == Config::Render::API::VK ? "deferred/vk_texture" : "deferred/gl_texture";
 
 	Shader vs = device->LoadShader(Shader::Type::VERTEX, deferred_texture_shader_name);
@@ -31,9 +31,12 @@ void Deferred::Create(GraphicsContext *context, FramebufferID out_fbo)
 
 	pipeline = device->CreatePipeline("deferred/static_meshes", pipeline_desc);
 
-	scene_set = device->CreateDescriptorSet(pipeline, Descriptor2::Set::SCENE);
-	device->WriteDescriptor(scene_set, 0, context->active_camera_ubo);
-	device->WriteDescriptor(scene_set, 1, context->model_matrices_ubo);
+	for (uint32_t i = 0; i < 3; i++)
+	{
+		scene_set[i] = device->CreateDescriptorSet(pipeline, Descriptor2::Set::SCENE);
+		device->WriteDescriptor(scene_set[i], 0, context[i].active_camera_ubo);
+		device->WriteDescriptor(scene_set[i], 1, context[i].model_matrices_ubo);
+	}
 }
 
 void Deferred::Destroy()
@@ -41,12 +44,12 @@ void Deferred::Destroy()
 	//
 }
 
-void Deferred::Render(std::vector<Mesh> &meshes)
+void Deferred::Render(std::vector<Mesh> &meshes, uint32_t current_index)
 {
 	//device->BeginRenderPass(gbuffer, RenderPass::Clear::COLOR_DEPTH);
 
 	device->BindPipeline(pipeline);
-	device->BindDescriptorSet(Descriptor2::Set::SCENE, scene_set);
+	device->BindDescriptorSet(Descriptor2::Set::SCENE, scene_set[current_index]);
 	//device->BindDescriptorSet(Descriptor2::Set::MATERIAL, context->material_set);
 
 	for (auto &mesh: meshes)
@@ -64,7 +67,7 @@ void Deferred::Render(std::vector<Mesh> &meshes)
 			{
 				surf.descriptor_set = device->CreateDescriptorSet(pipeline, Descriptor2::Set::MATERIAL);
 				//surf.material->Setup(device, surf.descriptor_set);
-				std::static_pointer_cast<CustomMaterial>(surf.material)->Setup2(device, context, Descriptor2::Set::MATERIAL, surf.descriptor_set);
+				std::static_pointer_cast<CustomMaterial>(surf.material)->Setup2(device, nullptr, Descriptor2::Set::MATERIAL, surf.descriptor_set);
 			}
 
 			//surf.material->Bind(device);

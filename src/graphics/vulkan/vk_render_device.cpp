@@ -67,7 +67,7 @@ RenderDeviceVK::~RenderDeviceVK()
 
 bool RenderDeviceVK::Create(SDL_Window *window_handle)
 {
-	vk->CreateInstance(window_handle, !IsRenderDocAttached());
+	vk->CreateInstance(window_handle, true); //!IsRenderDocAttached());
 	vk->ChoosePhysicalDevice();
 	vk->CreateSurface(window_handle);
 	vk->CreateDevice();
@@ -104,7 +104,7 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 	};
 
 	vkCreateCommandPool(vk->device, &poolInfo, nullptr, &vk->graphics_command_pool);
-	vk->frame_resources.resize(2);
+	vk->frame_resources.resize(3);
 
 	VkCommandBufferAllocateInfo allocInfo
 	{
@@ -577,22 +577,29 @@ void RenderDeviceVK::BeginFrame()
 	uint32_t prev_time = times[1] - times[0];
 
 	times[0] = SDL_GetTicks();
-	/*if (prev_time > 30)
+	if (prev_time > 30)
 		vkQueueWaitIdle(vk->graphics_queue);
 
-	else*/
-	//vkQueueWaitIdle(vk->graphics_queue);
-	vkWaitForFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence, VK_TRUE, UINT64_MAX);
+	else
+		vkWaitForFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence, VK_TRUE, UINT64_MAX);
+
 	vkResetFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence);
 	//vkQueueWaitIdle(vk->graphics_queue);
 	times[1] = SDL_GetTicks();
 
-	//Log() << "frame" << vk->frame_index;
-
 	VkResult result = vkAcquireNextImageKHR(vk->device, vk->swapchain, UINT64_MAX,
 											vk->frame_resources[vk->frame_index].present_semaphore,
 											VK_NULL_HANDLE, &vk->image_index);
+	//Log() << vk->image_index << vk->frame_index;
 	times[2] = SDL_GetTicks();
+
+	/*if (vk->swapchain_resources[vk->image_index].fence != VK_NULL_HANDLE &&
+			vk->swapchain_resources[vk->image_index].fence != vk->frame_resources[vk->frame_index].fence)
+	{
+		vkWaitForFences(vk->device, 1, &vk->swapchain_resources[vk->image_index].fence, VK_TRUE, UINT64_MAX);
+	}*/
+
+	vk->swapchain_resources[vk->image_index].fence = vk->frame_resources[vk->frame_index].fence;
 
 	//if (result != VK_SUCCESS)
 	//	Log() << result;
@@ -1416,6 +1423,16 @@ FramebufferID RenderDeviceVK::CreateFramebuffer(const FramebufferDesc &desc)
 Framebuffer RenderDeviceVK::GetFramebuffer(FramebufferID framebuffer)
 {
 	return store->framebuffers[framebuffer.handle];
+}
+
+uint32_t RenderDeviceVK::GetFrameIndex() const
+{
+	return vk->frame_index;
+}
+
+uint32_t RenderDeviceVK::GetFrameCount() const
+{
+	return vk->frame_resources.size();
 }
 
 /*Texture RenderDeviceVK::GetDepthTexture()

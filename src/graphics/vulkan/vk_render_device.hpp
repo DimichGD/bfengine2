@@ -81,6 +81,9 @@ public:
 	Texture CreateTexture(const std::string &name, const TextureDesc &desc) override;
 	FramebufferID CreateFramebuffer(const FramebufferDesc &desc) override;
 	Framebuffer GetFramebuffer(FramebufferID framebuffer);
+
+	uint32_t GetFrameIndex() const;
+	uint32_t GetFrameCount() const;
 	//Texture GetDepthTexture();
 	//void SetDepthTexture(Texture depth_texture);
 

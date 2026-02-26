@@ -107,8 +107,10 @@ bool WindowSDL3::CreateOpenGL(int major, int minor)
 bool WindowSDL3::CreateVulkan()
 {
 	//int pos = SDL_WINDOWPOS_CENTERED_DISPLAY(config->window.monitor);
+	//config->window.width = 1920;
+	//config->window.height = 1080;
 	stuff->wnd = SDL_CreateWindow("", /*pos, pos,*/ config->window.width, config->window.height,
-								  SDL_WINDOW_VULKAN /*| SDL_WINDOW_ALLOW_HIGHDPI*/);
+								  SDL_WINDOW_VULKAN /*| SDL_WINDOW_BORDERLESS*/ /*| SDL_WINDOW_ALLOW_HIGHDPI*/);
 
 	if (stuff->wnd == nullptr)
 	{
