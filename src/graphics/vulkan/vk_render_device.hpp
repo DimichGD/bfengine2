@@ -1,17 +1,12 @@
 #pragma once
 #include "core/config.hpp"
 #include "graphics/render_device.hpp"
+#include "graphics/shader_description.hpp"
 #include "io/file.hpp"
 
 struct SDL_Window;
 
 BF_BEGIN_NAMESPACE
-
-struct TrackedResource
-{
-	ImageLayout prev = ImageLayout::UNDEFINED;
-	//ImageLayout next = ImageLayout::UNDEFINED;
-};
 
 class RenderDeviceVK: public RenderDevice
 {
@@ -26,14 +21,15 @@ public:
 
 	//Shader CreateShader(const std::string &name, Shader::Type type, const std::vector<char> &source);
 	Shader LoadShader(Shader::Type type, const std::string &name) override;
+	Shader LoadShader(const std::string &name, const ShaderDesc &desc);
+	Shader LoadShader(const std::string &name, ShaderDesc &desc, const std::vector<uint32_t> &binary);
 	void LoadMaterialDefinition(const std::string &filename);
 	PipelineID CreatePipeline(const std::string &name, const PipelineDesc &desc) override;
-	void Test();
 	//void CreatePipelineLayout(const std::map<Descriptor::Set, std::vector<Descriptor>> &descriptors);
 	//void CreatePipelineLayout(const PipelineLayout &layout);
 	void BindPipeline(PipelineID pipeline) override;
 	void Draw(uint32_t first, uint32_t count) override;
-	void DrawIndexed(uint32_t first, uint32_t count) override {}
+	void DrawIndexed(uint32_t first, uint32_t count) override;
 
 	void BeginFrame() override;
 	void BeginRenderPass(FramebufferID framebuffer_id, RenderPass::Clear clear_flags) override;
@@ -72,8 +68,8 @@ public:
 	void BindDescriptorSet(Descriptor2::Set index, DescriptorSet descriptor_set) override; // TODO: rename index
 	//void Push(Shader::Type type, uint32_t offset, glm::vec4 value);
 	//void Push(Shader::Type type, uint32_t offset, int value) override;
-	void PushConstant(uint32_t slot, int value) override;
-	void PushConstant(uint32_t slot, float value) override;
+	void PushConstant(EngineConstants slot, int value) override;
+	void PushConstant(EngineConstants slot, float value) override;
 	//void Push(size_t size, size_t offset, void *value);
 	/*void SetUniform1i(int value);
 	void SetUniform2i(std::array<int, 2> values);*/
@@ -100,6 +96,8 @@ private:
 	Storage *store = nullptr;
 
 	uint32_t times[32] {};
+
+	std::map<uint32_t, ShaderDesc> shader_desc_map;
 
 	//std::map<Handle, TrackedResource> tracked_resources;
 	//std::vector<ImageLayout> swapchain_image_prev_layouts;

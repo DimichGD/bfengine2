@@ -17,10 +17,10 @@ void Debug::Create(std::vector<GraphicsContext> &context, FramebufferID out_fbo)
 	const char *forward_line_shader_name = config->render.api == Config::Render::API::VK ? "forward/vk_line" : "forward/gl_line";
 	const char *forward_texture_shader_name = config->render.api == Config::Render::API::VK ? "forward/vk_texture" : "forward/gl_texture";
 
-	Shader vs_line = device->LoadShader(Shader::Type::VERTEX, forward_line_shader_name);
-	Shader fs_line = device->LoadShader(Shader::Type::FRAGMENT, forward_line_shader_name);
-	Shader vs_texture = device->LoadShader(Shader::Type::VERTEX, forward_texture_shader_name);
-	Shader fs_texture = device->LoadShader(Shader::Type::FRAGMENT, forward_texture_shader_name);
+	Shader vs_line = resources->LoadShader("general vertex position");
+	Shader fs_line = resources->LoadShader("general fragment color");
+	Shader vs_texture = resources->LoadShader("general vertex texture");
+	Shader fs_texture = resources->LoadShader("general fragment texture");
 
 	PipelineDesc pipeline_line_desc
 	{
@@ -51,7 +51,7 @@ void Debug::Create(std::vector<GraphicsContext> &context, FramebufferID out_fbo)
 	pipeline_lines = device->CreatePipeline("debug/colored_lines", pipeline_line_desc);
 	pipeline_meshes = device->CreatePipeline("debug/textured_meshes", pipeline_mesh_desc);
 
-	for (uint32_t i = 0; i < 3; i++)
+	for (uint32_t i = 0; i < static_cast<RenderDeviceVK *>(device)->GetFrameCount(); i++)
 	{
 		scene_set_lines[i] = device->CreateDescriptorSet(pipeline_lines, Descriptor2::Set::SCENE);
 		scene_set_meshes[i] = device->CreateDescriptorSet(pipeline_meshes, Descriptor2::Set::SCENE);
@@ -82,11 +82,11 @@ void Debug::Render(std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2, uint32
 	{
 		device->BindVertexBuffer(mesh.vbo);
 		//device->Push(Shader::Type::VERTEX, 0, mesh.matrix_index);
-		device->PushConstant(0, int(mesh.matrix_index));
+		device->PushConstant(EngineConstants::OBJECT_INDEX, int(mesh.matrix_index));
 		for (auto &surf: mesh.surfaces)
 		{
 			//device->Push(Shader::Type::FRAGMENT, 4, surf.material_index);
-			device->PushConstant(1, int(surf.material_index));
+			device->PushConstant(EngineConstants::MATERIAL_INDEX, int(surf.material_index));
 			//materials.at(surf.texture_index).Bind(device);
 			//if (!surf.material->Ready())
 			//	surf.material->Setup(device, device->CreateDescriptorSet(pipeline_lines, Descriptor2::Set::MATERIAL));
@@ -104,7 +104,7 @@ void Debug::Render(std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2, uint32
 	{
 		device->BindVertexBuffer(mesh.vbo);
 		//device->Push(Shader::Type::VERTEX, 0, mesh.matrix_index);
-		device->PushConstant(0, int(mesh.matrix_index));
+		device->PushConstant(EngineConstants::OBJECT_INDEX, int(mesh.matrix_index));
 		for (auto &surf: mesh.surfaces)
 		{
 			//device->Push(Shader::Type::FRAGMENT, 4, 0);

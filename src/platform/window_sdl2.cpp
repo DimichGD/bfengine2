@@ -144,6 +144,14 @@ bool WindowSDL3::Update(InputHandler &input)
 				minimized = false;
 				break;
 
+			case SDL_EVENT_WINDOW_EXPOSED:
+				//Log() << "Exposed";
+				break;
+
+			case SDL_EVENT_WINDOW_MOVED:
+				//Log() << "Moved";
+				break;
+
 			case SDL_EVENT_WINDOW_FOCUS_LOST:
 				break;
 

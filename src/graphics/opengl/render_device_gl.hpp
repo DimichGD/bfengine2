@@ -45,8 +45,8 @@ public:
 	void WriteDescriptor(DescriptorSet set, uint32_t binding, Texture value, uint32_t index = 0) override;
 	void BindDescriptorSet(Descriptor2::Set index, DescriptorSet descriptor_set) override; // TODO: rename arguments
 	//void Push(Shader::Type type, uint32_t offset, int value) override;
-	void PushConstant(uint32_t slot, int value) override;
-	void PushConstant(uint32_t slot, float value) override;
+	void PushConstant(EngineConstants slot, int value) override;
+	void PushConstant(EngineConstants slot, float value) override;
 
 	FramebufferID CreateFramebuffer(const FramebufferDesc &desc) override;
 

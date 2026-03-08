@@ -2,7 +2,9 @@
 #include "core/log.hpp"
 #include "io/file.hpp"
 #include "utils/lexer.hpp"
+#include "utils/parser.hpp"
 #include <SDL3_image/SDL_image.h>
+#include <fmt/format.h>
 
 BF_BEGIN_NAMESPACE
 
@@ -11,45 +13,31 @@ ResourceManager::ResourceManager(RenderDevice *device, FileSystem *fs)
 	this->device = device;
 	this->fs = fs;
 
-	/*File def_file(fs->GetDataPath() + "materials/definitions.txt");
+	File def_file(fs->GetDataPath() + "shaders/shaders.def");
 	def_file.Open();
 
 	auto buffer = def_file.Read();
-	Lexer lexer(buffer);
-	lexer.Parse();
-	auto it = lexer.Tokens().begin();*/
+	Parser parser(buffer);
+	shader_descriptions.merge(parser.DoStuff()); // TODO: check if parser result map has remaining items
 
+	File mat_file(fs->GetDataPath() + "materials/materials.def");
+	mat_file.Open();
 
-	material_descriptions["doom_static"] = {
-		{ EngineDescriptor::CAMERA_MATRICES, EngineDescriptor::MODEL_MATRICES },
-		{ EngineConstants::OBJECT_INDEX },
-		{
-			{ "diffuse_map", { Texture::Format::SRGBA8 } },
-			{ "normal_map", { Texture::Format::RGBA8 } },
-			{ "specular_map", { Texture::Format::RGBA8 } },
-		},
-		device->LoadShader(Shader::Type::VERTEX, "deferred/vk_texture"),
-		device->LoadShader(Shader::Type::FRAGMENT, "deferred/vk_texture"),
-	};
+	buffer = mat_file.Read();
+	Parser parser2(buffer);
+	//material_defs.merge(parser2.DoStuff2());
+	for (auto mat: parser2.DoStuff2())
+	{
+		std::vector<Texture> textures;
 
-	std::string material_name = "wall/gotbwall4";
-	Texture tex_d = LoadTexture(material_name + "_d.ktx", Texture::Format::SRGBA8);
-	Texture tex_n = LoadTexture(material_name + "_local.ktx", Texture::Format::RGBA8);
-	Texture tex_s = LoadTexture(material_name + "_s.ktx", Texture::Format::RGBA8);
-	//materials[material_name] = std::make_shared<PhongMaterial>(tex_d, tex_n, tex_s);
-	materials[material_name] = std::make_shared<CustomMaterial>(material_name, &material_descriptions["doom_static"],
-																std::vector<Texture> { tex_d, tex_n, tex_s });
+		for (auto tex: mat.second)
+			textures.push_back(LoadTexture(tex.first, tex.second));
 
-	material_name = "floor/diafloor";
-	tex_d = LoadTexture(material_name + "_d.ktx", Texture::Format::SRGBA8);
-	tex_n = LoadTexture(material_name + "_local.ktx", Texture::Format::RGBA8);
-	tex_s = LoadTexture(material_name + "_s.ktx", Texture::Format::RGBA8);
-	//materials[material_name] = std::make_shared<PhongMaterial>(tex_d, tex_n, tex_s);
-	materials[material_name] = std::make_shared<CustomMaterial>(material_name, &material_descriptions["doom_static"],
-																std::vector<Texture> { tex_d, tex_n, tex_s });
+		materials[mat.first] = std::make_shared<CustomMaterial>(mat.first, std::move(textures), 0);
+	}
 
-	material_name = "red.png";
-	tex_d = LoadTexture(material_name);
+	std::string material_name = "red.png";
+	Texture tex_d = LoadTexture(material_name);
 	materials[material_name] = std::make_shared<Material>(tex_d);
 }
 
@@ -59,7 +47,7 @@ ResourceManager::~ResourceManager()
 	//IMG_Quit();
 }
 
-Texture ResourceManager::LoadKTX2(std::string_view filename, Texture::Format format)
+Texture ResourceManager::LoadKTX2(std::string_view filename)
 {
 	File file(fs->GetDataPath() + "textures/" + filename);
 	if (!file.Open())
@@ -121,6 +109,21 @@ Texture ResourceManager::LoadKTX2(std::string_view filename, Texture::Format for
 		//Log() << level.byte_offset << level.byte_length << level.uncompressed_byte_length;
 	}
 
+	Texture::Format format;
+	switch (vk_format)
+	{
+		case 37:
+			format = Texture::Format::RGBA8;
+			break;
+
+		case 43:
+			format = Texture::Format::SRGBA8;
+			break;
+
+		default:
+			throw std::runtime_error("Unknown texture format");
+	}
+
 	uint32_t bytes_read = 0;
 	std::vector<char> pixels(total_bytes);
 	for (auto &level: levels)
@@ -131,9 +134,6 @@ Texture ResourceManager::LoadKTX2(std::string_view filename, Texture::Format for
 		bytes_read += level.byte_length;
 	}
 
-	//if (filename.contains("_local") || filename.contains("_s"))
-	//	format = Texture::Format::RGBA8;
-
 	//Log() << filename << vk_format;
 
 	TextureDesc desc
@@ -143,7 +143,7 @@ Texture ResourceManager::LoadKTX2(std::string_view filename, Texture::Format for
 		.format = format,
 		.usage = Texture::Usage::SHADER_READ,
 		.levels = level_count,
-		.pixels = pixels.data(),
+		.pixels = std::move(pixels),
 		.generate_mipmaps = false,
 	};
 
@@ -155,8 +155,8 @@ Texture ResourceManager::LoadKTX2(std::string_view filename, Texture::Format for
 
 Texture ResourceManager::LoadTexture(std::string_view filename, Texture::Format format)
 {
-	if (filename.contains(".ktx"))
-		return LoadKTX2(filename, format);
+	if (filename.ends_with(".ktx"))
+		return LoadKTX2(filename);
 
 	File file(fs->GetDataPath() + "textures/" + filename);
 	if (!file.Open())
@@ -200,6 +200,9 @@ Texture ResourceManager::LoadTexture(std::string_view filename, Texture::Format 
 
 	//Log() << "Color space srgb" << (SDL_GetSurfaceColorspace(surf) == SDL_COLORSPACE_SRGB);
 
+	std::vector<char> pixels(surf->pitch * surf->h);
+	std::memcpy(pixels.data(), surf->pixels, pixels.size());
+
 	TextureDesc desc
 	{
 		.width = uint32_t(surf->w),
@@ -207,7 +210,7 @@ Texture ResourceManager::LoadTexture(std::string_view filename, Texture::Format 
 		.format = format,
 		.usage = Texture::Usage::SHADER_READ,
 		.levels = 1,
-		.pixels = surf->pixels,
+		.pixels = std::move(pixels),
 		.generate_mipmaps = true,
 	};
 
@@ -221,9 +224,42 @@ std::shared_ptr<IMaterial> ResourceManager::LoadMaterial(const std::string &name
 {
 	auto it = materials.find(name);
 	if (it == materials.end())
-		return nullptr; // Load material
+		throw std::runtime_error(fmt::format("material {} not found", name));
 
 	return it->second;
+}
+
+Shader ResourceManager::LoadShader(const std::string &name)
+{
+	auto cache_it = shader_cache.find(name);
+	if (cache_it != shader_cache.end())
+		return cache_it->second;
+
+	RenderDeviceVK *vk_device = static_cast<RenderDeviceVK *>(device);
+	std::string cache_name = name + ".spv";
+	std::replace(cache_name.begin(), cache_name.end(), '/', '-');
+	std::replace(cache_name.begin(), cache_name.end(), ' ', '-');
+
+	auto desc_it = shader_descriptions.find(name);
+	if (desc_it == shader_descriptions.end())
+	{
+		Error() << "Shader description" << name << "not found";
+		return {};
+	}
+
+	File source_file(fs->GetDataPath() + "shaders/" + desc_it->second.filename);
+	File cache_file(fs->GetDataPath() + "shaders/cache/" + cache_name);
+	if (cache_file.Open() && cache_file.LastWriteTime() >= source_file.LastWriteTime())
+	{
+		std::vector<uint32_t> binary(cache_file.Size() / sizeof(uint32_t));
+		cache_file.Read(binary.data(), cache_file.Size());
+
+		Shader shader = vk_device->LoadShader(cache_name, desc_it->second, binary);
+		shader_cache[name] = shader;
+		return shader;
+	}
+
+	return vk_device->LoadShader(cache_name, desc_it->second);
 }
 
 Mesh ResourceManager::LoadMesh(std::string_view filename)
@@ -270,7 +306,8 @@ Mesh ResourceManager::LoadMesh(std::string_view filename)
 			Texture tex_s = LoadTexture(material_name + "_s.png");
 			PhongMaterial *mat = new PhongMaterial(tex_d, tex_n, tex_s);*/
 			//Log() << material_name;
-			surfaces[i] = { { vertex_start, vertex_count }, LoadMaterial(material_name), 0, {} };
+			auto material = std::static_pointer_cast<CustomMaterial>(LoadMaterial(material_name));
+			surfaces[i] = { { vertex_start, vertex_count }, material, material->index, {} };
 		}
 	}
 

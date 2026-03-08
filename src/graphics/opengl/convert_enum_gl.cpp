@@ -11,6 +11,7 @@ GLenum ConvertEnum(GPUBuffer::Type value)
 		case GPUBuffer::Type::VERTEX: return GL_ARRAY_BUFFER;
 		case GPUBuffer::Type::INDEX: return GL_ELEMENT_ARRAY_BUFFER;
 		case GPUBuffer::Type::UNIFORM: return GL_UNIFORM_BUFFER;
+		case GPUBuffer::Type::STORAGE: return GL_SHADER_STORAGE_BUFFER;
 		case GPUBuffer::Type::STAGING: return {}; // TODO: report error?
 	}
 

@@ -1,16 +1,3 @@
-#version 460 core
-#pragma shader_stage(fragment)
-
-//layout(set = 0, binding = 2) uniform sampler2D textures[64];
-layout(set = 1, binding = 0) uniform sampler2D diffuse_map;
-layout(set = 1, binding = 1) uniform sampler2D normal_map;
-layout(set = 1, binding = 2) uniform sampler2D specular_map;
-
-/*layout(push_constant) uniform Constants
-{
-	layout(offset = 4) int U_MATERIAL_INDEX;
-};*/
-
 layout(location = 0) in vec2 TEXCOORD_0;
 layout(location = 1) in vec3 NORMAL;
 layout(location = 2) in vec3 BINORMAL;
@@ -25,9 +12,6 @@ void main()
 	vec4 D = texture(diffuse_map, TEXCOORD_0);
 	vec3 N = normalize(texture(normal_map, TEXCOORD_0).xyz * 2.0 - 1.0);
 	vec4 S = texture(specular_map, TEXCOORD_0);
-	/*vec4 D = texture(textures[U_MATERIAL_INDEX * 3 + 0], TEXCOORD_0);
-	vec3 N = normalize(texture(textures[U_MATERIAL_INDEX * 3 + 1], TEXCOORD_0).xyz * 2.0 - 1.0);
-	vec4 S = texture(textures[U_MATERIAL_INDEX * 3 + 2], TEXCOORD_0);*/
 	
 	N.x = -N.x;
 	mat3 TBN = mat3(normalize(TANGENT), normalize(BINORMAL), normalize(NORMAL));

@@ -25,6 +25,7 @@ SOURCES += \
     src/graphics/vulkan/vk_internal.cpp \
     src/graphics/vulkan/vk_pipeline_builder.cpp \
     src/graphics/vulkan/vk_render_device.cpp \
+    src/graphics/vulkan/vk_shader_builder.cpp \
     src/graphics/vulkan/vk_shader_reflection.cpp \
     src/io/file.cpp \
     src/main.cpp \
@@ -54,12 +55,14 @@ HEADERS += \
     src/graphics/render_paths/deferred_render_path.hpp \
     src/graphics/render_paths/graphics_context.hpp \
     src/graphics/render_paths/point_light_render_path.hpp \
+    src/graphics/shader_description.hpp \
     src/graphics/types.hpp \
     src/graphics/vulkan/vk_convert_enum.hpp \
     src/graphics/vulkan/vk_enumerate_stuff.hpp \
     src/graphics/vulkan/vk_internal.hpp \
     src/graphics/vulkan/vk_pipeline_builder.hpp \
     src/graphics/vulkan/vk_render_device.hpp \
+    src/graphics/vulkan/vk_shader_builder.hpp \
     src/graphics/vulkan/vk_shader_reflection.hpp \
     src/io/file.hpp \
     src/math/matrix.hpp \
@@ -67,6 +70,7 @@ HEADERS += \
     src/platform/window_sdl2.hpp \
     src/ui/font.hpp \
     src/ui/ui_manager.hpp \
+    src/utils/enum_operators.hpp \
     src/utils/hash.hpp \
     src/utils/lexer.hpp \
     src/utils/parser.hpp \

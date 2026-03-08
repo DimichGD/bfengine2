@@ -7,6 +7,19 @@ Lexer::Lexer(std::vector<char> &buffer)
 {
 	current = buffer.begin();
 	end = buffer.end();
+
+	keywords = {
+		{ "shader", Keyword::SHADER },
+		{ "type", Keyword::TYPE },
+		{ "file", Keyword::FILE },
+		{ "input", Keyword::INPUT },
+		{ "output", Keyword::OUTPUT },
+		{ "uniforms", Keyword::UNIFORMS },
+		{ "buffer", Keyword::BUFFER },
+		{ "constant", Keyword::CONSTANT },
+		{ "texture", Keyword::TEXTURE },
+		{ "material", Keyword::MATERIAL },
+	};
 }
 
 bool Lexer::Parse()
@@ -60,7 +73,12 @@ void Lexer::ParseIdentifier()
 		++current;
 
 	std::string_view text = { start, current + 1 };
-	AddToken(Token::Type::IDENTIFIER, text);
+
+	auto it = keywords.find(std::string(text));
+	if (it != keywords.end())
+		tokens.emplace_back(Token::Type::KEYWORD, it->second);
+	else
+		AddToken(Token::Type::IDENTIFIER, text);
 
 	/*auto it = keywords.find(text);
 		if (it != keywords.end())

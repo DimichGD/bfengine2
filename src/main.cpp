@@ -84,7 +84,7 @@ int main()
 		.format = Texture::Format::RGBA16F,
 		.usage = Texture::Usage::COLOR_ATTACHMENT | Texture::Usage::SHADER_READ,
 		.levels = 1,
-		.pixels = nullptr,
+		.pixels = {},
 		.generate_mipmaps = false,
 	};
 
@@ -95,7 +95,7 @@ int main()
 		.format = Texture::Format::D24S8,
 		.usage = Texture::Usage::DEPTH_ATTACHMENT | Texture::Usage::SHADER_READ,
 		.levels = 1,
-		.pixels = nullptr,
+		.pixels = {},
 		.generate_mipmaps = false,
 	};
 
@@ -131,7 +131,7 @@ int main()
 	for (auto &context: graphics_context)
 	{
 		context.active_camera_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4) * 2);
-		context.model_matrices_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, matrices);
+		context.model_matrices_ubo = device->CreateBuffer(GPUBuffer::STORAGE, matrices);
 		context.colors_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, colors);
 		context.point_lights_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, point_lights);
 		context.camera_light_data = device->CreateBuffer(GPUBuffer::UNIFORM, sizeof(PointLightCameraData) * 1);
@@ -165,16 +165,20 @@ int main()
 		context.final_fbo = device->CreateFramebuffer(final_fbo_desc);
 
 		context.text_vbo = device->CreateBuffer(GPUBuffer::VERTEX, sizeof(float) * 5 * 6 * 100);
+
+		frame_index++;
 	}
 
 
 
 	//FramebufferID gbuffer = device->CreateFramebuffer(framebuffer_desc);
 
-	Shader vs_flip = device->LoadShader(Shader::Type::VERTEX, flip_shader_name);
-	Shader fs_flip = device->LoadShader(Shader::Type::FRAGMENT, flip_shader_name);
+	//Shader vs_flip = device->LoadShader(Shader::Type::VERTEX, flip_shader_name);
+	//Shader fs_flip = device->LoadShader(Shader::Type::FRAGMENT, flip_shader_name);
+	Shader vs_flip = resources.LoadShader("general vertex ui");
+	Shader fs_flip = resources.LoadShader("general fragment texture");
 
-	TextureDesc final_texture_desc
+	/*TextureDesc final_texture_desc
 	{
 		.width = config.window.width,
 		.height = config.window.height,
@@ -183,7 +187,7 @@ int main()
 		.levels = 1,
 		.pixels = nullptr,
 		.generate_mipmaps = false,
-	};
+	};*/
 
 	/*Texture flip_texture = device->CreateTexture("Flip Texture", final_texture_desc);
 
@@ -226,7 +230,7 @@ int main()
 	PipelineID pipeline_flip = device->CreatePipeline("Flip Pipeline", pipeline_flip_desc);
 	DescriptorSet flip_scene_set[3];
 	DescriptorSet flip_material_set[3];
-	for (uint32_t i = 0; i < 3; i++)
+	for (uint32_t i = 0; i < device->GetFrameCount(); i++)
 	{
 		flip_scene_set[i] = device->CreateDescriptorSet(pipeline_flip, Descriptor2::Set::SCENE);
 		flip_material_set[i] = device->CreateDescriptorSet(pipeline_flip, Descriptor2::Set::MATERIAL);
@@ -238,8 +242,10 @@ int main()
 	device->WriteDescriptor(flip_scene_set, 0, ortho_ubo);
 	device->WriteDescriptor(flip_material_set, 0, flip_texture);*/
 
-	Shader vs4 = device->LoadShader(Shader::Type::VERTEX, ui_texture_shader_name);
-	Shader fs4 = device->LoadShader(Shader::Type::FRAGMENT, ui_texture_shader_name);
+	//Shader vs4 = device->LoadShader(Shader::Type::VERTEX, ui_texture_shader_name);
+	Shader vs4 = resources.LoadShader("general vertex ui");
+	Shader fs4 = resources.LoadShader("general fragment texture color");
+	//Shader fs4 = device->LoadShader(Shader::Type::FRAGMENT, ui_texture_shader_name);
 
 	PipelineDesc desc4
 	{
@@ -286,8 +292,8 @@ int main()
 	if (config.render.api == Config::Render::API::VK)
 		proj[1][1] *= -1;
 
-	GPUBuffer camera_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4) * 2);
-	device->UpdateBuffer(camera_ubo, sizeof(glm::mat4), glm::value_ptr(proj), 0);
+	//GPUBuffer camera_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4) * 2);
+	//device->UpdateBuffer(camera_ubo, sizeof(glm::mat4), glm::value_ptr(proj), 0);
 
 
 	//GPUBuffer matrices_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, matrices);
@@ -326,13 +332,13 @@ int main()
 	font.SetTextureScale(1.0f / 512.0f);
 	DescriptorSet ui_scene_set[3];
 	DescriptorSet ui_material_set[3];
-	for (uint32_t i = 0; i < 3; i++)
+	for (uint32_t i = 0; i < device->GetFrameCount(); i++)
 	{
 		ui_scene_set[i] = device->CreateDescriptorSet(pipeline_ui, Descriptor2::Set::SCENE);
 		ui_material_set[i] = device->CreateDescriptorSet(pipeline_ui, Descriptor2::Set::MATERIAL);
 
 		device->WriteDescriptor(ui_scene_set[i], 0, ortho_ubo);
-		device->WriteDescriptor(ui_scene_set[i], 1, graphics_context[i].colors_ubo);
+		device->WriteDescriptor(ui_scene_set[i], 2, graphics_context[i].colors_ubo);
 		device->WriteDescriptor(ui_material_set[i], 0, font_tex);
 	}
 
@@ -358,6 +364,11 @@ int main()
 	std::vector<Mesh> meshes3;
 	meshes3.push_back(resources.LoadMesh("sphere.bin"));
 	meshes3[0].matrix_index = 2;
+
+	Transform light_transform;
+	glm::mat4 light_matrix = glm::mat4_cast(light_transform.rot);
+	light_matrix[3] = glm::vec4(light_transform.pos, 1.0f);
+	matrices[3] = glm::scale(light_matrix, glm::vec3(point_lights[0].w, point_lights[0].w, point_lights[0].w));
 
 	enum class EditingMode
 	{
@@ -385,6 +396,8 @@ int main()
 	Input input;
 	while (wnd.Update(input))
 	{
+		//Log() << "Begin Frame";
+
 		if (wnd.Minimized()) // Wrong
 			continue;
 
@@ -525,7 +538,7 @@ int main()
 		if (glm::intersectRayPlane(orig, dir, plane_orig, plane_normal, dist))
 		{
 			sphere_pos = orig + dir * dist;
-			sphere_pos = glm::round(sphere_pos / 2.0f) * 2.0f;
+			//sphere_pos = glm::round(sphere_pos / 2.0f) * 2.0f;
 		}
 
 		glm::mat sphere_matrix = glm::translate(glm::mat4(1.0f), sphere_pos);
@@ -587,7 +600,8 @@ int main()
 		device->BindDescriptorSet(Descriptor2::Set::SCENE, ui_scene_set[device->GetFrameIndex()]);
 		device->BindDescriptorSet(Descriptor2::Set::MATERIAL, ui_material_set[device->GetFrameIndex()]);
 		//device->Push(Shader::Type::FRAGMENT, 4, 3);
-		device->PushConstant(0, 3); // slot index is 0 for fragment shader, do something about it?
+		device->PushConstant(EngineConstants::OBJECT_INDEX, 0); // WTF?
+		device->PushConstant(EngineConstants::MATERIAL_INDEX, 3); // slot index is 0 for fragment shader, do something about it?
 
 		std::span<float> text_verts = device->MapBuffer<float>(context->text_vbo);
 		//text_string = fmt::format("{} {} {} {}", view_transform.rot.x, view_transform.rot.y, view_transform.rot.z, view_transform.rot.w);
@@ -602,8 +616,10 @@ int main()
 
 		device->LayoutTransition({}, ImageLayout::COLOR_ATTACHMENT, ImageLayout::PRESENT);
 		//device->LayoutTransition({}, ImageLayout::UNDEFINED, ImageLayout::PRESENT);
+
 		device->EndFrame();
 		wnd.Swap();
+		//SDL_Delay(10);
 
 		//SDL_Delay(1);
 		end_time = SDL_GetTicks();

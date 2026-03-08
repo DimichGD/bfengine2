@@ -1,5 +1,5 @@
 #pragma once
-#include "core/defines.hpp"
+#include "utils/enum_operators.hpp"
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
@@ -59,43 +59,6 @@ struct Vertex
 		UI,
 	};
 
-	/*struct PosTexNormalTangentBones
-	{
-		glm::vec3 pos;
-		glm::vec2 uv;
-		glm::vec3 normal;
-		glm::vec4 tangent;
-		glm::ivec4 bones;
-		glm::vec4 weights;
-	};
-
-	struct PosTexNormalTangent
-	{
-		glm::vec3 pos;
-		glm::vec2 uv;
-		glm::vec3 normal;
-		glm::vec4 tangent;
-	};
-
-	struct PosTexBones
-	{
-		glm::vec3 pos;
-		glm::vec2 uv;
-		glm::ivec4 bones;
-		glm::vec4 weights;
-	};
-
-	struct PosTex
-	{
-		glm::vec3 pos;
-		glm::vec2 uv;
-	};
-
-	struct Pos
-	{
-		glm::vec3 pos;
-	};*/
-
 	static constexpr std::array<uint32_t, 8> sizes { 3, 2, 2, 3, 3, 4, 4, 4 };
 
 	enum class Type
@@ -104,7 +67,19 @@ struct Vertex
 	};
 };
 
-inline constexpr Vertex::Attrib operator|(Vertex::Attrib lhs, Vertex::Attrib rhs)
+
+
+template<>
+struct IsEnumFlag<Vertex::Attrib>: std::true_type {};
+
+
+
+/*inline constexpr Vertex::Attrib operator|(Vertex::Attrib lhs, Vertex::Attrib rhs)
+{
+	return static_cast<Vertex::Attrib>(std::to_underlying(lhs) | std::to_underlying(rhs));
+}
+
+inline constexpr Vertex::Attrib operator|=(Vertex::Attrib lhs, Vertex::Attrib rhs)
 {
 	return static_cast<Vertex::Attrib>(std::to_underlying(lhs) | std::to_underlying(rhs));
 }
@@ -117,7 +92,7 @@ inline constexpr std::underlying_type_t<Vertex::Attrib> operator&(Vertex::Attrib
 inline constexpr Vertex::Attrib operator&(Vertex::Attrib lhs, Vertex::Attrib rhs)
 {
 	return static_cast<Vertex::Attrib>(std::to_underlying(lhs) & std::to_underlying(rhs));
-}
+}*/
 
 struct Range
 {
@@ -159,6 +134,7 @@ struct GPUBuffer: Handle
 		VERTEX,
 		INDEX,
 		UNIFORM,
+		STORAGE,
 		STAGING,
 	};
 
@@ -459,7 +435,10 @@ struct Texture: Handle
 	}
 };
 
-inline constexpr Texture::Usage operator|(Texture::Usage lhs, Texture::Usage rhs)
+template<>
+struct IsEnumFlag<Texture::Usage>: std::true_type {};
+
+/*inline constexpr Texture::Usage operator|(Texture::Usage lhs, Texture::Usage rhs)
 {
 	return static_cast<Texture::Usage>(std::to_underlying(lhs) | std::to_underlying(rhs));
 }
@@ -472,7 +451,7 @@ inline constexpr std::underlying_type_t<Texture::Usage> operator&(Texture::Usage
 inline constexpr Texture::Usage operator&(Texture::Usage lhs, Texture::Usage rhs)
 {
 	return static_cast<Texture::Usage>(std::to_underlying(lhs) & std::to_underlying(rhs));
-}
+}*/
 
 struct TextureDesc
 {
@@ -481,7 +460,8 @@ struct TextureDesc
 	Texture::Format format {};
 	Texture::Usage usage {};
 	uint32_t levels = 0;
-	void *pixels = nullptr;
+	//void *pixels = nullptr;
+	std::vector<char> pixels {};
 	bool generate_mipmaps = false;
 };
 
@@ -501,7 +481,7 @@ struct Framebuffer
 	};*/
 
 	std::vector<Texture> color_textures;
-	std::vector<Texture::Format> color_formats;
+	//std::vector<Texture::Format> color_formats;
 	Texture depth_texture {};
 	uint32_t width = 0;
 	uint32_t height = 0;

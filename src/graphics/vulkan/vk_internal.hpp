@@ -59,6 +59,9 @@ struct FrameResource
 	VkSemaphore present_semaphore = VK_NULL_HANDLE;
 	VkCommandBuffer command_buffer = VK_NULL_HANDLE;
 
+	VkCommandPool command_pool = VK_NULL_HANDLE;
+	uint64_t last_signaled_value = 0;
+
 	//VkSemaphore render_semaphore = VK_NULL_HANDLE;
 };
 
@@ -105,6 +108,8 @@ struct RenderDeviceVK::Internal
 	VkFormat swapchain_format = VK_FORMAT_UNDEFINED;
 	std::vector<SwapchainResource> swapchain_resources;
 	std::vector<FrameResource> frame_resources;
+	VkSemaphore timeline_semaphore = VK_NULL_HANDLE;
+	uint64_t present_id = 0;
 	/*VkImage depth_image = VK_NULL_HANDLE;
 	VkDeviceMemory depth_memory = VK_NULL_HANDLE;
 	VkImageView depth_image_view = VK_NULL_HANDLE;*/
@@ -128,6 +133,7 @@ struct RenderDeviceVK::Internal
 	VkCommandPool transfer_command_pool = VK_NULL_HANDLE;
 	uint32_t frame_index = 0;
 	uint32_t image_index = 0;
+	uint64_t frame_timeline_index = 0;
 
 	/*uint32_t host_memory_type_index = 3;
 	uint32_t device_memory_type_index = 1;
@@ -142,6 +148,7 @@ struct RenderDeviceVK::Internal
 	VkCommandBuffer current_command_buffer = VK_NULL_HANDLE;
 
 	PFN_vkSetDebugUtilsObjectNameEXT SetDebugUtilsObjectName = nullptr;
+	PFN_vkWaitForPresentKHR WaitForPresentKHR = nullptr;
 
 	void CreateInstance(SDL_Window *wnd, bool enable_debug_layers);
 	void ChoosePhysicalDevice();

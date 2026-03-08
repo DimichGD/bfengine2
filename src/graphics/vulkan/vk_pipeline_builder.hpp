@@ -14,17 +14,10 @@ public:
 	void SetTopology(Topology topology);
 	void SetLayout(VkPipelineLayout layout);
 	void SetRasterState(Raster raster_state);
-	void SetSwapchainFormat(VkFormat color_format, VkFormat depth_format);
+	void SetSwapchainFormat(VkFormat color_format, VkFormat depth_format = VK_FORMAT_UNDEFINED);
 	//void SetAttachmentFormats(std::vector<bf::Texture::Format> formats);
 	void SetFramebuffer(const Framebuffer &framebuffer);
 	void AppendShader(VkShaderStageFlagBits stage, VkShaderModule module);
-
-	VkPipeline CreateVertexInputStage(Vertex::Attrib vertex_attribs, Topology topology);
-	VkPipeline CreateVertexShaderStage(const std::string &name,
-									   std::span<const uint32_t> binary, VkPipelineLayout layout);
-	VkPipeline CreateFragmentShaderStage(const std::string &name,
-						std::span<const uint32_t> binary, VkPipelineLayout layout);
-	VkPipeline CreateFragmentOutputStage(Raster raster_state);
 
 	VkPipeline Build(VkDevice device, VkPipelineCache pipeline_cache);
 

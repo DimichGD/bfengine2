@@ -1,0 +1,95 @@
+shader "general vertex position"
+{
+	type vertex
+	file "generic/position_vert.glsl"
+	input [ POSITION ]
+	uniforms [ CAMERA_MATRICES MODEL_MATRICES OBJECT_INDEX ]
+	buffer CAMERA_MATRICES
+	buffer MODEL_MATRICES
+	constant OBJECT_INDEX
+}
+
+shader "general vertex texture"
+{
+	type vertex
+	file "generic/texture_vert.glsl"
+	input [ POSITION TEXCOORD_0 ]
+	buffer CAMERA_MATRICES
+	buffer MODEL_MATRICES
+	constant OBJECT_INDEX
+}
+
+shader "general vertex static normal tangent"
+{
+	type vertex
+	file "generic/static_mesh_vert.glsl"
+	input [ POSITION TEXCOORD_0 NORMAL TANGENT ]
+	buffer CAMERA_MATRICES
+	buffer MODEL_MATRICES
+	constant OBJECT_INDEX
+}
+
+shader "general vertex ui"
+{
+	type vertex
+	file "generic/ui_texture_vert.glsl"
+	input [ POSITION TEXCOORD_0 ]
+	buffer UI_CAMERA_MATRIX
+	constant OBJECT_INDEX
+}
+
+shader "general fragment texture"
+{
+	type fragment
+	file "generic/texture_frag.glsl"
+	texture diffuse_map
+}
+
+shader "general fragment color"
+{
+	type fragment
+	file "generic/color_frag.glsl"
+	buffer COLORS
+	constant MATERIAL_INDEX
+}
+
+shader "general fragment texture color"
+{
+	type fragment
+	file "generic/ui_texture_frag.glsl"
+	buffer COLORS
+	constant MATERIAL_INDEX
+	texture diffuse_map
+}
+
+shader "deferred fragment diffuse normal specular"
+{
+	type fragment
+	file "deferred/gbuffer_normal_spec_frag.glsl"
+	texture diffuse_map
+	texture normal_map
+	texture specular_map
+}
+
+shader "deferred vertex point_light"
+{
+	type vertex
+	file "deferred/point_light_vert.glsl"
+	input [ POSITION ]
+	buffer CAMERA_MATRICES
+	buffer MODEL_MATRICES
+	constant OBJECT_INDEX
+}
+
+shader "deferred fragment point_light phong"
+{
+	type fragment
+	file "deferred/point_light_frag.glsl"
+	buffer LIGHT_CAMERA_DATA
+	buffer POINT_LIGHTS
+	texture diffuse_map
+	texture normal_map
+	texture specular_map
+	texture depth_map
+	constant MATERIAL_INDEX
+}

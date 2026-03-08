@@ -1,8 +1,23 @@
 #pragma once
 #include "core/defines.hpp"
 #include "io/file.hpp"
+#include <map>
 
 BF_BEGIN_NAMESPACE
+
+enum class Keyword
+{
+	SHADER,
+	TYPE,
+	FILE,
+	INPUT,
+	OUTPUT,
+	UNIFORMS,
+	BUFFER,
+	CONSTANT,
+	TEXTURE,
+	MATERIAL,
+};
 
 class Token
 {
@@ -21,6 +36,7 @@ public:
 
 		// literals
 		IDENTIFIER, NUMBER, STRING,
+		KEYWORD, // use actual enums?
 
 		// keywords
 		VAR, FUNC, RETURN,
@@ -33,6 +49,13 @@ public:
 		this->type = type;
 	}
 
+
+	Token(Type type, Keyword keyword)
+	{
+		this->type = type;
+		this->keyword = keyword;
+	}
+
 	Token(Type type, std::string_view literal)
 	{
 		this->type = type;
@@ -42,6 +65,11 @@ public:
 	Type GetType() const
 	{
 		return type;
+	}
+
+	Keyword GetKeyword() const
+	{
+		return keyword;
 	}
 
 	std::string_view GetLiteral() const
@@ -56,6 +84,7 @@ public:
 
 private:
 	Type type;
+	Keyword keyword;
 	std::string_view literal;
 };
 
@@ -65,7 +94,7 @@ public:
 	Lexer(std::vector<char> &buffer);
 	bool Parse();
 	void Dump();
-	const std::vector<Token> &Tokens() const { return tokens; }
+	std::vector<Token> &Tokens() { return tokens; }
 
 protected:
 	void ParseIdentifier();
@@ -84,6 +113,8 @@ private:
 
 	std::vector<Token> tokens;
 	size_t line = 0;
+
+	std::map<std::string, Keyword> keywords;
 };
 
 BF_END_NAMESPACE

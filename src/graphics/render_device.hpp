@@ -1,5 +1,6 @@
 #pragma once
 #include "core/defines.hpp"
+#include "graphics/shader_description.hpp"
 #include "graphics/types.hpp"
 #include <vector>
 
@@ -34,8 +35,8 @@ public:
 	virtual void WriteDescriptor(DescriptorSet set, uint32_t binding, Texture value, uint32_t index = 0) = 0;
 	virtual void BindDescriptorSet(Descriptor2::Set index, DescriptorSet descriptor_set) = 0;
 	//virtual void Push(Shader::Type type, uint32_t offset, int value) = 0;
-	virtual void PushConstant(uint32_t slot, int value) = 0;
-	virtual void PushConstant(uint32_t slot, float value) = 0;
+	virtual void PushConstant(EngineConstants slot, int value) = 0;
+	virtual void PushConstant(EngineConstants slot, float value) = 0;
 
 	template<typename T>
 	GPUBuffer CreateBuffer(GPUBuffer::Type type, const std::vector<T> &vector)

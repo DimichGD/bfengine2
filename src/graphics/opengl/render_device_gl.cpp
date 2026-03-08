@@ -201,9 +201,9 @@ void RenderDeviceGL::SetCullMode(uint32_t mode)
 	GLenum cull_mode = GL_BACK;
 	switch (mode)
 	{
-		case 1:  cull_mode = GL_FRONT; break;
-		case 2:  cull_mode = GL_BACK; break;
-		case 3:  cull_mode = GL_FRONT_AND_BACK; break;
+		case 1: cull_mode = GL_FRONT; break;
+		case 2: cull_mode = GL_BACK; break;
+		case 3: cull_mode = GL_FRONT_AND_BACK; break;
 	}
 
 	glEnable(GL_CULL_FACE);
@@ -236,18 +236,18 @@ void RenderDeviceGL::BindDescriptorSet(Descriptor2::Set index, DescriptorSet des
 		switch (desc.value.index())
 		{
 			case 0:
-				{
-					Texture texture = std::get<Texture>(desc.value);
-					glBindTextureUnit(binding, texture.handle);
-				}
+			{
+				Texture texture = std::get<Texture>(desc.value);
+				glBindTextureUnit(binding, texture.handle);
 				break;
+			}
 
 			case 1:
-				{
-					GPUBuffer buffer = std::get<GPUBuffer>(desc.value);
-					glBindBufferBase(gl::ConvertEnum(buffer.type), binding, buffer.handle);
-				}
+			{
+				GPUBuffer buffer = std::get<GPUBuffer>(desc.value);
+				glBindBufferBase(gl::ConvertEnum(buffer.type), binding, buffer.handle);
 				break;
+			}
 		}
 	}
 }
@@ -261,14 +261,14 @@ void RenderDeviceGL::BindDescriptorSet(Descriptor2::Set index, DescriptorSet des
 		glUniform1i(1, value);
 }*/
 
-void RenderDeviceGL::PushConstant(uint32_t slot, int value)
+void RenderDeviceGL::PushConstant(EngineConstants slot, int value)
 {
-	glUniform1i(slot, value);
+	glUniform1i(uint32_t(slot), value);
 }
 
-void RenderDeviceGL::PushConstant(uint32_t slot, float value)
+void RenderDeviceGL::PushConstant(EngineConstants slot, float value)
 {
-	glUniform1f(slot, value);
+	glUniform1f(uint32_t(slot), value);
 }
 
 FramebufferID RenderDeviceGL::CreateFramebuffer(const FramebufferDesc &desc)
@@ -434,13 +434,13 @@ Texture RenderDeviceGL::CreateTexture(const std::string &name, const TextureDesc
 
 	glTextureStorage2D(tex, levels, format.internal_format, desc.width, desc.height);
 
-	if (desc.pixels != nullptr)
+	if (!desc.pixels.empty())
 	{
 		uint32_t offset = 0;
 		for (uint32_t i = 0; i < desc.levels; i++)
 		{
 			glTextureSubImage2D(tex, i, 0, 0, desc.width >> i, desc.height >> i, format.format, format.type,
-								(char *)desc.pixels + offset);
+								desc.pixels.data() + offset);
 			offset += (desc.width >> i) * (desc.height >> i) * 4; // TODO: get format pixel size
 		}
 	}
@@ -542,7 +542,7 @@ VertexLayout RenderDeviceGL::CreateVertexLayout(Vertex::Attrib attribs)
 	uint32_t offset = 0;
 	for (uint32_t i = 0; i < 8; i++)
 	{
-		if (attribs & (1 << i))
+		if (bool(attribs & Vertex::Attrib(1 << i)))
 		{
 			glEnableVertexArrayAttrib(vao, i);
 			glVertexArrayAttribBinding(vao, i, 0);

@@ -202,26 +202,40 @@ void RenderDeviceVK::Internal::CreateDevice()
 	std::array device_extensions
 	{
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-		VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
-		VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME,
+		VK_KHR_PRESENT_ID_EXTENSION_NAME,
+		VK_KHR_PRESENT_WAIT_EXTENSION_NAME,
 		VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
 	};
 
-	VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT device_pipeline_library {};
+	/*VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT device_pipeline_library {};
 	device_pipeline_library.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT;
-	device_pipeline_library.graphicsPipelineLibrary = VK_TRUE;
+	device_pipeline_library.graphicsPipelineLibrary = VK_TRUE;*/
 
-	VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features {};
+	VkPhysicalDevicePresentWaitFeaturesKHR present_wait_features
+	{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_WAIT_FEATURES_KHR,
+		.pNext = nullptr,
+		.presentWait = VK_TRUE,
+	};
+
+	VkPhysicalDevicePresentIdFeaturesKHR present_id_features
+	{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_ID_FEATURES_KHR,
+		.pNext = &present_wait_features,
+		.presentId = VK_TRUE,
+	};
+
+	/*VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features {};
 	descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
 	descriptor_indexing_features.pNext = &device_pipeline_library;
-	/*descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
-	descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
-	descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_TRUE;*/
-	descriptor_indexing_features.descriptorBindingPartiallyBound = VK_TRUE;
+	// descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+	// descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
+	// descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_TRUE;
+	descriptor_indexing_features.descriptorBindingPartiallyBound = VK_TRUE;*/
 
 	VkPhysicalDeviceVulkan14Features device_features_1_4 {};
 	device_features_1_4.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
-	device_features_1_4.pNext = &descriptor_indexing_features;
+	device_features_1_4.pNext = &present_id_features;
 	device_features_1_4.hostImageCopy = VK_TRUE;
 
 	VkPhysicalDeviceVulkan13Features device_features_1_3 {};
@@ -230,9 +244,18 @@ void RenderDeviceVK::Internal::CreateDevice()
 	device_features_1_3.dynamicRendering = VK_TRUE;
 	device_features_1_3.synchronization2 = VK_TRUE;
 
+	VkPhysicalDeviceVulkan12Features device_features_1_2 {};
+	device_features_1_2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+	device_features_1_2.pNext = &device_features_1_3;
+	device_features_1_2.timelineSemaphore = VK_TRUE;
+	device_features_1_2.descriptorIndexing = VK_TRUE;
+	device_features_1_2.runtimeDescriptorArray = VK_TRUE;
+	device_features_1_2.descriptorBindingPartiallyBound = VK_TRUE;
+	device_features_1_2.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+
 	VkPhysicalDeviceFeatures2 phys_device_features {};
 	phys_device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-	phys_device_features.pNext = &device_features_1_3;
+	phys_device_features.pNext = &device_features_1_2;
 	//phys_device_features.features.samplerAnisotropy = VK_TRUE;
 	//phys_device_features.features.shaderUniformBufferArrayDynamicIndexing = VK_TRUE;
 	//phys_device_features.features.multiDrawIndirect = VK_TRUE;
@@ -257,6 +280,12 @@ void RenderDeviceVK::Internal::CreateDevice()
 
 	vkGetDeviceQueue(device, graphics_family_index, 0, &graphics_queue);
 	vkGetDeviceQueue(device, transfer_family_index, 0, &transfer_queue);
+
+	WaitForPresentKHR =
+		std::bit_cast<PFN_vkWaitForPresentKHR>(vkGetDeviceProcAddr(device, "vkWaitForPresentKHR"));
+
+	if (!WaitForPresentKHR)
+		throw std::runtime_error("vkWaitForPresentKHR not found"); // TODO: make it optional
 }
 
 void RenderDeviceVK::Internal::CreateSwapchain()

@@ -15,8 +15,10 @@ PointLightRenderPath::PointLightRenderPath(RenderDevice *device, Config *config,
 void PointLightRenderPath::Create(std::vector<GraphicsContext> &context, /*const std::vector<Texture> &textures, Texture depth_texture,*/ FramebufferID out_fbo)
 {
 	const char *deferred_light_shader_name = config->render.api == Config::Render::API::VK ? "deferred/vk_point_light" : "deferred/gl_point_light";
-	Shader vs = device->LoadShader(Shader::Type::VERTEX, deferred_light_shader_name);
-	Shader fs = device->LoadShader(Shader::Type::FRAGMENT, deferred_light_shader_name);
+	//Shader vs = device->LoadShader(Shader::Type::VERTEX, deferred_light_shader_name);
+	Shader vs = resources->LoadShader("deferred vertex point_light");
+	Shader fs = resources->LoadShader("deferred fragment point_light phong");
+	//Shader fs = device->LoadShader(Shader::Type::FRAGMENT, deferred_light_shader_name);
 
 	PipelineDesc pipeline_desc
 	{
@@ -34,13 +36,14 @@ void PointLightRenderPath::Create(std::vector<GraphicsContext> &context, /*const
 
 	pipeline = device->CreatePipeline("deferred/point_light", pipeline_desc);
 
-	for (uint32_t i = 0; i < 3; i++)
+	for (uint32_t i = 0; i < static_cast<RenderDeviceVK *>(device)->GetFrameCount(); i++)
 	{
 		scene_set[i] = device->CreateDescriptorSet(pipeline, Descriptor2::Set::SCENE);
 		material_set[i] = device->CreateDescriptorSet(pipeline, Descriptor2::Set::MATERIAL);
 
 		device->WriteDescriptor(scene_set[i], 0, context[i].active_camera_ubo);
-		device->WriteDescriptor(scene_set[i], 2, context[i].point_lights_ubo);
+		device->WriteDescriptor(scene_set[i], 1, context[i].model_matrices_ubo);
+		device->WriteDescriptor(scene_set[i], 4, context[i].point_lights_ubo);
 		device->WriteDescriptor(scene_set[i], 3, context[i].camera_light_data);
 
 		device->WriteDescriptor(material_set[i], 0, context[i].gbuffer_textures[0]);
@@ -119,7 +122,8 @@ void PointLightRenderPath::Render(uint32_t current_index)
 	device->BindVertexBuffer(sphere_vbo);
 	//device->Push(Shader::Type::VERTEX, 0, 0);
 	//device->Push(Shader::Type::FRAGMENT, 4, 0);
-	device->PushConstant(0, 0);
+	device->PushConstant(EngineConstants::OBJECT_INDEX, 3);
+	device->PushConstant(EngineConstants::MATERIAL_INDEX, 0);
 	device->Draw(0, sphere_vertex_count);
 
 	//device->EndRenderPass({});

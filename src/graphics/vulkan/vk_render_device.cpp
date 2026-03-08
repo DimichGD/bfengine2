@@ -3,6 +3,7 @@
 #include "graphics/vulkan/vk_internal.hpp"
 #include "graphics/vulkan/vk_render_device.hpp"
 #include "graphics/vulkan/vk_convert_enum.hpp"
+#include "graphics/vulkan/vk_shader_builder.hpp"
 #include "graphics/vulkan/vk_shader_reflection.hpp"
 #include "graphics/vulkan/vk_pipeline_builder.hpp"
 #include "io/file.hpp"
@@ -19,12 +20,12 @@
 BF_BEGIN_NAMESPACE
 
 BF_BEGIN_VK_NAMESPACE
-struct Shader
+/*struct Shader
 {
 	std::vector<uint32_t> spirv;
 	bf::Shader::Type type;
 	VkPipelineLayout layout;
-};
+};*/
 BF_END_VK_NAMESPACE
 
 struct RenderDeviceVK::Storage
@@ -95,7 +96,28 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 	//Log() << props.limits.maxViewportDimensions[0] << props.limits.maxViewportDimensions[1];
 	//Log() << props.limits.minUniformBufferOffsetAlignment;
 
-	VkCommandPoolCreateInfo poolInfo
+
+	vk->frame_resources.resize(3);
+
+	VkSemaphoreTypeCreateInfoKHR semaphore_type_ci
+	{
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO_KHR,
+		.pNext = nullptr,
+		.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+		.initialValue = 0,
+	};
+
+	VkSemaphoreCreateInfo semaphore_ci
+	{
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+		.pNext = &semaphore_type_ci,
+		.flags = 0,
+	};
+
+	vkCreateSemaphore(vk->device, &semaphore_ci, nullptr, &vk->timeline_semaphore);
+
+
+	VkCommandPoolCreateInfo command_pool_ci
 	{
 		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 		.pNext = nullptr,
@@ -103,21 +125,22 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 		.queueFamilyIndex = vk->graphics_family_index,
 	};
 
-	vkCreateCommandPool(vk->device, &poolInfo, nullptr, &vk->graphics_command_pool);
-	vk->frame_resources.resize(3);
-
-	VkCommandBufferAllocateInfo allocInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.pNext = nullptr,
-		.commandPool = vk->graphics_command_pool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = 1,
-	};
-
 	for (uint32_t i = 0; i < vk->frame_resources.size(); i++)
 	{
-		vkAllocateCommandBuffers(vk->device, &allocInfo, &vk->frame_resources[i].command_buffer);
+		vkCreateCommandPool(vk->device, &command_pool_ci, nullptr, &vk->frame_resources[i].command_pool);
+		vk->SetObjectName(VK_OBJECT_TYPE_COMMAND_POOL, vk->frame_resources[i].command_pool,
+						  fmt::format("Graphics Command Pool {}", i).c_str());
+
+		VkCommandBufferAllocateInfo alloc_info
+		{
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.pNext = nullptr,
+			.commandPool = vk->frame_resources[i].command_pool,
+			.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+			.commandBufferCount = 1,
+		};
+
+		vkAllocateCommandBuffers(vk->device, &alloc_info, &vk->frame_resources[i].command_buffer);
 		vk->SetObjectName(VK_OBJECT_TYPE_COMMAND_BUFFER, vk->frame_resources[i].command_buffer,
 						  fmt::format("Graphics Command Buffer {}", i).c_str());
 
@@ -144,6 +167,8 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 						  fmt::format("Fence {}", i).c_str());
 
 		// new stuff
+
+		vk->frame_resources[i].last_signaled_value = i;
 
 		/*vkCreateSemaphore(vk->device, &semaphore_ci, nullptr, &vk->frame_resources[i].render_semaphore);
 		vk->SetObjectName(VK_OBJECT_TYPE_SEMAPHORE, vk->frame_resources[i].render_semaphore,
@@ -191,34 +216,18 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 
 	vk->current_command_buffer = vk->frame_resources[vk->frame_index].command_buffer;
 
-	poolInfo.queueFamilyIndex = vk->transfer_family_index;
+	/*poolInfo.queueFamilyIndex = vk->transfer_family_index;
 	vkCreateCommandPool(vk->device, &poolInfo, nullptr, &vk->transfer_command_pool);
 
 	allocInfo.commandPool = vk->transfer_command_pool;
 	vkAllocateCommandBuffers(vk->device, &allocInfo, &vk->transfer_command_buffer);
-	vk->SetObjectName(VK_OBJECT_TYPE_COMMAND_BUFFER, vk->transfer_command_buffer, "Transfer Command Buffer");
+	vk->SetObjectName(VK_OBJECT_TYPE_COMMAND_BUFFER, vk->transfer_command_buffer, "Transfer Command Buffer");*/
 
-	/*VkSemaphoreCreateInfo semaphore_ci
-	{
-		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-		.pNext = nullptr,
-		.flags = 0,
-	};
-
-	vkCreateSemaphore(vk->device, &semaphore_ci, nullptr, &vk->swapchain_semaphore);
-
-	VkFenceCreateInfo fence_ci
-	{
-		.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-		.pNext = nullptr,
-		.flags = VK_FENCE_CREATE_SIGNALED_BIT,
-	};
-
-	vkCreateFence(vk->device, &fence_ci, nullptr, &vk->fence);*/
 
 	std::vector<VkDescriptorPoolSize> pool_sizes
 	{
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100 },
 		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
 	};
 
@@ -226,7 +235,7 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 	{
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 		.pNext = nullptr,
-		.flags = 0,
+		.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
 		.maxSets = 100,
 		.poolSizeCount = uint32_t(pool_sizes.size()),
 		.pPoolSizes = pool_sizes.data(),
@@ -281,6 +290,10 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 	};
 
 	vkCreatePipelineCache(vk->device, &pipeline_cache_ci, nullptr, &vk->pipeline_cache);
+
+	/*vkAcquireNextImageKHR(vk->device, vk->swapchain, UINT64_MAX,
+											vk->frame_resources[vk->frame_index].present_semaphore,
+											VK_NULL_HANDLE, &vk->image_index);*/
 
 	return true;
 }
@@ -447,6 +460,86 @@ Shader RenderDeviceVK::LoadShader(Shader::Type type, const std::string &name)
 	return Shader(store->shader_modules.size() - 1, type);
 }
 
+Shader RenderDeviceVK::LoadShader(const std::string &name, const ShaderDesc &desc)
+{
+	File source_file(fs->GetDataPath() + "shaders/" + desc.filename);
+	source_file.Open();
+
+	std::string source;
+	source.resize(source_file.Size());
+	source_file.Read(source.data(), source.size());
+
+	source = vk::GetShaderString(desc) + source;
+	//Log() << name;
+	//Log() << source;
+
+	std::vector<uint32_t> binary;
+	binary = vk::CompileShader(desc.filename, desc.type, source);
+
+	File binary_file(fs->GetDataPath() + "shaders/cache/" + name);
+	if (!binary_file.Open(File::Access::WRITE))
+		return {};
+
+	binary_file.Write(binary.data(), binary.size() * sizeof(uint32_t));
+
+	ShaderReflectionData reflection_data = vk::GetShaderReflection(desc.filename, desc.type, binary.data(), binary.size());
+
+	VkShaderModuleCreateInfo shader_ci
+	{
+		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.codeSize = binary.size() * sizeof(uint32_t),
+		.pCode = binary.data(),
+	};
+
+	VkShaderModule module;
+	VkResult result = vkCreateShaderModule(vk->device, &shader_ci, nullptr, &module);
+	if (result != VK_SUCCESS)
+	{
+		Log() << "vkCreateShaderModule failed";
+		return {};
+	}
+
+	vk->SetObjectName(VK_OBJECT_TYPE_SHADER_MODULE, module, desc.filename.c_str());
+
+	shader_desc_map[store->shader_modules.size()] = desc;
+
+	store->shader_modules.push_back(module);
+	store->shader_reflection[store->shader_modules.size() - 1] = std::move(reflection_data);
+	return Shader(store->shader_modules.size() - 1, desc.type);
+}
+
+Shader RenderDeviceVK::LoadShader(const std::string &name, ShaderDesc &desc, const std::vector<uint32_t> &binary)
+{
+	ShaderReflectionData reflection_data = vk::GetShaderReflection(name, desc.type, binary.data(), binary.size());
+
+	VkShaderModuleCreateInfo shader_ci
+	{
+		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.codeSize = binary.size() * sizeof(uint32_t),
+		.pCode = binary.data(),
+	};
+
+	VkShaderModule module;
+	VkResult result = vkCreateShaderModule(vk->device, &shader_ci, nullptr, &module);
+	if (result != VK_SUCCESS)
+	{
+		Log() << "vkCreateShaderModule failed";
+		return {};
+	}
+
+	vk->SetObjectName(VK_OBJECT_TYPE_SHADER_MODULE, module, name.c_str());
+
+	shader_desc_map[store->shader_modules.size()] = desc;
+
+	store->shader_modules.push_back(module);
+	store->shader_reflection[store->shader_modules.size() - 1] = std::move(reflection_data);
+	return Shader(store->shader_modules.size() - 1, desc.type);
+}
+
 void RenderDeviceVK::LoadMaterialDefinition(const std::string &filename)
 {
 	//
@@ -456,10 +549,13 @@ PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const Pipelin
 {
 	vk::Pipeline pipeline;
 
-	pipeline.layout = vk::CreatePipelineLayout(vk->device,
+	/*pipeline.layout = vk::CreatePipelineLayout(vk->device,
 		store->descriptor_set_layouts,
 		{ &store->shader_reflection[desc.shaders[0].handle], &store->shader_reflection[desc.shaders[1].handle] },
-		pipeline.constant_ranges, pipeline.decriptor_set_layouts, 0);
+		pipeline.constant_ranges, pipeline.decriptor_set_layouts, 0);*/
+
+	vk::CreatePipelineLayout(vk->device, pipeline, store->descriptor_set_layouts,
+							 { shader_desc_map[desc.shaders[0].handle], shader_desc_map[desc.shaders[1].handle] });
 
 	//if (name == "deferred/static_meshes")
 	//	std::terminate();
@@ -479,12 +575,8 @@ PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const Pipelin
 
 	if (desc.framebuffer_id)
 		builder.SetFramebuffer(GetFramebuffer(desc.framebuffer_id));
-		//builder.SetAttachmentFormats(store->framebuffers[desc.framebuffer_id.handle].color_formats);
 	else
-		builder.SetSwapchainFormat(vk->swapchain_format, VK_FORMAT_UNDEFINED);
-		//builder.SetSwapchainFormat(vk->swapchain_format, vk::ConvertEnum(vk->depth_texture_fffuuu.format));
-
-	//builder.CreateFragmentOutputStage(desc.raster);
+		builder.SetSwapchainFormat(vk->swapchain_format);
 
 	for (const Shader &shader: desc.shaders)
 		builder.AppendShader(vk::ConvertEnum(shader.type), store->shader_modules[shader.handle]);
@@ -497,66 +589,6 @@ PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const Pipelin
 
 	store->pipelines.push_back(pipeline);
 	return { { uint32_t(store->pipelines.size() - 1) } };
-}
-
-void RenderDeviceVK::Test()
-{
-	vk::Pipeline pipeline;
-	vk::GraphicsPipelineBuilder builder(vk->device);
-	builder.SetSwapchainFormat(vk->swapchain_format, VK_FORMAT_D24_UNORM_S8_UINT);
-
-	File vs_file(fs->GetDataPath() + "shaders/cache/ui_vk_texture_vert.spv");
-	vs_file.Open();
-	std::vector<uint32_t> vs_binary(vs_file.Size() / 4);
-	vs_file.Read(vs_binary.data(), vs_file.Size());
-	auto vs_reflection = vk::GetShaderReflection("ui_vk_texture_vert.spv", Shader::Type::VERTEX, vs_binary.data(), vs_binary.size());
-	std::vector<VkDescriptorSetLayout> vs_decriptor_set_layouts;
-	//VkPipelineLayout vs_layout = vk::CreatePipelineLayout(vk->device, { &vs_reflection }, vs_decriptor_set_layouts);
-
-	File fs_file(fs->GetDataPath() + "shaders/cache/ui_vk_texture_frag.spv");
-	fs_file.Open();
-	std::vector<uint32_t> fs_binary(fs_file.Size() / 4);
-	fs_file.Read(fs_binary.data(), fs_file.Size());
-	auto fs_reflection = vk::GetShaderReflection("ui_vk_texture_frag.spv", Shader::Type::FRAGMENT, fs_binary.data(), fs_binary.size());
-	std::vector<VkDescriptorSetLayout> fs_decriptor_set_layouts;
-	//VkPipelineLayout fs_layout = vk::CreatePipelineLayout(vk->device, { &fs_reflection }, fs_decriptor_set_layouts);
-
-	VkPipelineLayout vs_layout = vk::CreatePipelineLayout(vk->device, store->descriptor_set_layouts, { &vs_reflection },
-														  pipeline.constant_ranges, pipeline.decriptor_set_layouts, VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
-
-	VkPipelineLayout fs_layout = vk::CreatePipelineLayout(vk->device, store->descriptor_set_layouts, { &fs_reflection },
-														  pipeline.constant_ranges, pipeline.decriptor_set_layouts, VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
-
-	std::array<VkPipeline, 4> stages;
-	stages[0] = builder.CreateVertexInputStage(Vertex::Attrib::POSITION | Vertex::Attrib::TEXCOORD_0, Topology::TRIANGLES);
-	stages[1] = builder.CreateVertexShaderStage("vertex_shader", vs_binary, vs_layout);
-	stages[2] = builder.CreateFragmentShaderStage("fragment_shader", fs_binary, fs_layout);
-	stages[3] = builder.CreateFragmentOutputStage({});
-
-	VkPipelineLibraryCreateInfoKHR linking_info {};
-	linking_info.sType        = VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR;
-	linking_info.libraryCount = static_cast<uint32_t>(stages.size());
-	linking_info.pLibraries   = stages.data();
-
-	std::vector<VkDescriptorSetLayout> decriptor_set_layouts;
-	std::array<vk::ConstantRange, 4> constant_ranges;
-	VkPipelineLayout combined_layout = vk::CreatePipelineLayout(vk->device,
-													store->descriptor_set_layouts,
-													{ &vs_reflection, &fs_reflection },
-													constant_ranges,
-													decriptor_set_layouts, VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
-	vk->SetObjectName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, combined_layout, "combined_layout");
-	vk->SetObjectName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, vs_layout, "vertex_layout");
-	vk->SetObjectName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, fs_layout, "fragment_layout");
-
-	VkGraphicsPipelineCreateInfo executable_pipeline_create_info {};
-	executable_pipeline_create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	executable_pipeline_create_info.pNext = &linking_info;
-	executable_pipeline_create_info.flags = 0;
-	executable_pipeline_create_info.layout = VK_NULL_HANDLE;
-
-	VkPipeline executable = VK_NULL_HANDLE;
-	vkCreateGraphicsPipelines(vk->device, VK_NULL_HANDLE, 1, &executable_pipeline_create_info, nullptr, &executable);
 }
 
 
@@ -572,37 +604,51 @@ void RenderDeviceVK::Draw(uint32_t first, uint32_t count)
 	vkCmdDraw(vk->current_command_buffer, count, 1, first, 0);
 }
 
+void RenderDeviceVK::DrawIndexed(uint32_t first, uint32_t count)
+{
+	vkCmdDrawIndexed(vk->current_command_buffer, count, 1, first, 0, 0);
+}
+
 void RenderDeviceVK::BeginFrame()
 {
 	uint32_t prev_time = times[1] - times[0];
 
 	times[0] = SDL_GetTicks();
-	if (prev_time > 30)
+	/*if (prev_time > 30)
 		vkQueueWaitIdle(vk->graphics_queue);
 
-	else
-		vkWaitForFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence, VK_TRUE, UINT64_MAX);
+	else*/
+	uint32_t prev_frame_index = vk->frame_index == 0 ? vk->frame_resources.size() - 1 : vk->frame_index - 1;
 
+	/*uint64_t wait_value = vk->frame_resources[vk->frame_index].last_signaled_value;
+	VkSemaphoreWaitInfo wait_semaphore_present_info
+	{
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.semaphoreCount = 1,
+		.pSemaphores = &vk->timeline_semaphore,
+		.pValues = &wait_value,
+	};
+
+	vkWaitSemaphores(vk->device, &wait_semaphore_present_info, UINT64_MAX);*/
+
+	//Log() << vk->present_id;
+
+	if (vk->present_id > vk->swapchain_resources.size())
+		vk->WaitForPresentKHR(vk->device, vk->swapchain, vk->present_id - 2, UINT64_MAX);
+
+
+	vkWaitForFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence, VK_TRUE, UINT64_MAX);
 	vkResetFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence);
 	//vkQueueWaitIdle(vk->graphics_queue);
-	times[1] = SDL_GetTicks();
+	//times[1] = SDL_GetTicks();
 
 	VkResult result = vkAcquireNextImageKHR(vk->device, vk->swapchain, UINT64_MAX,
 											vk->frame_resources[vk->frame_index].present_semaphore,
 											VK_NULL_HANDLE, &vk->image_index);
 	//Log() << vk->image_index << vk->frame_index;
-	times[2] = SDL_GetTicks();
-
-	/*if (vk->swapchain_resources[vk->image_index].fence != VK_NULL_HANDLE &&
-			vk->swapchain_resources[vk->image_index].fence != vk->frame_resources[vk->frame_index].fence)
-	{
-		vkWaitForFences(vk->device, 1, &vk->swapchain_resources[vk->image_index].fence, VK_TRUE, UINT64_MAX);
-	}*/
-
-	vk->swapchain_resources[vk->image_index].fence = vk->frame_resources[vk->frame_index].fence;
-
-	//if (result != VK_SUCCESS)
-	//	Log() << result;
+	//times[2] = SDL_GetTicks();
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 		throw std::runtime_error("Swapchain out of date!!!");
@@ -615,6 +661,23 @@ void RenderDeviceVK::BeginFrame()
 		.pInheritanceInfo = nullptr,
 	};
 
+	/*if (vk->frame_timeline_index >= vk->frame_resources.size())
+	{
+		uint64_t wait_value = (vk->frame_timeline_index - vk->frame_resources.size()) + 1;
+		VkSemaphoreWaitInfo wait_semaphore_present_info
+		{
+			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.semaphoreCount = 1,
+			.pSemaphores = &vk->timeline_semaphore,
+			.pValues = &wait_value,
+		};
+
+		vkWaitSemaphores(vk->device, &wait_semaphore_present_info, UINT64_MAX);
+	}*/
+
+	vk->current_command_buffer = vk->frame_resources[vk->frame_index].command_buffer;
 	vkResetCommandBuffer(vk->current_command_buffer, 0);
 	vkBeginCommandBuffer(vk->current_command_buffer, &beginInfo);
 
@@ -623,6 +686,153 @@ void RenderDeviceVK::BeginFrame()
 
 	//swapchain_image_prev_layouts[vk->image_index] = ImageLayout::UNDEFINED;
 }
+
+void RenderDeviceVK::EndFrame()
+{
+	uint32_t prev_frame_index = vk->frame_index == 0 ? vk->frame_resources.size() - 1 : vk->frame_index - 1;
+	//LayoutTransition({}, ImageLayout::COLOR_ATTACHMENT, ImageLayout::PRESENT);
+
+	vkEndCommandBuffer(vk->current_command_buffer);
+
+	VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+
+	VkSubmitInfo submit_info
+	{
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.pNext = nullptr,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &vk->frame_resources[vk->frame_index].present_semaphore,
+		.pWaitDstStageMask = wait_stages,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &vk->current_command_buffer,
+		.signalSemaphoreCount = 1,
+		.pSignalSemaphores = &vk->swapchain_resources[vk->image_index].render_semaphore,
+	};
+
+	times[3] = SDL_GetTicks();
+	//vkResetFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence);
+	times[4] = SDL_GetTicks();
+	//vkQueueSubmit(vk->graphics_queue, 1, &submit_info, vk->frame_resources[vk->frame_index].fence);
+
+	VkSemaphoreSubmitInfo wait_semaphore_submit_info
+	{
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+		.pNext = nullptr,
+		.semaphore = vk->frame_resources[vk->frame_index].present_semaphore,
+		.value = 0,
+		.stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.deviceIndex = 0,
+	};
+
+	VkSemaphoreSubmitInfo signal_semaphore_submit_info
+	{
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+		.pNext = nullptr,
+		.semaphore = vk->timeline_semaphore, //vk->swapchain_resources[vk->image_index].render_semaphore,
+		.value = vk->frame_timeline_index + 1,
+		.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+		.deviceIndex = 0,
+	};
+
+	VkSemaphoreSubmitInfo signal_semaphore_submit_info_2
+	{
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+		.pNext = nullptr,
+		.semaphore = vk->swapchain_resources[vk->image_index].render_semaphore,
+		.value = 0,
+		.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+		.deviceIndex = 0,
+	};
+
+	VkCommandBufferSubmitInfo command_buffer_info
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+		.pNext = nullptr,
+		.commandBuffer = vk->current_command_buffer,
+		.deviceMask = 0,
+	};
+
+	VkSemaphoreSubmitInfo signals[2] { signal_semaphore_submit_info_2, signal_semaphore_submit_info };
+
+	VkSubmitInfo2 submit_info_2
+	{
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+		.pNext = nullptr,
+		.flags = 0,
+		.waitSemaphoreInfoCount = 1,
+		.pWaitSemaphoreInfos = &wait_semaphore_submit_info,
+		.commandBufferInfoCount = 1,
+		.pCommandBufferInfos = &command_buffer_info,
+		.signalSemaphoreInfoCount = 1,
+		.pSignalSemaphoreInfos = signals,
+	};
+
+	//vkResetFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence);
+
+	vkQueueSubmit2(vk->graphics_queue, 1, &submit_info_2, vk->frame_resources[vk->frame_index].fence); //vk->frame_resources[vk->frame_index].fence);
+
+	/*uint64_t wait_value = vk->frame_timeline_index + 1;
+	VkSemaphoreWaitInfo wait_semaphore_present_info
+	{
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.semaphoreCount = 1,
+		.pSemaphores = &vk->timeline_semaphore,
+		.pValues = &wait_value,
+	};
+
+	vkWaitSemaphores(vk->device, &wait_semaphore_present_info, UINT64_MAX);*/
+
+	times[5] = SDL_GetTicks();
+
+	VkPresentIdKHR present_id_info
+	{
+		.sType = VK_STRUCTURE_TYPE_PRESENT_ID_KHR,
+		.pNext = nullptr,
+		.swapchainCount = 1,
+		.pPresentIds = &vk->present_id,
+	};
+
+	VkResult result;
+	VkPresentInfoKHR present_info
+	{
+		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.pNext = &present_id_info,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &vk->swapchain_resources[vk->image_index].render_semaphore,
+		.swapchainCount = 1,
+		.pSwapchains = &vk->swapchain,
+		.pImageIndices = &vk->image_index,
+		.pResults = &result,
+	};
+
+	vkQueuePresentKHR(vk->graphics_queue, &present_info);
+	times[6] = SDL_GetTicks();
+
+	vk->frame_timeline_index += 1;
+	vk->frame_resources[vk->frame_index].last_signaled_value = vk->frame_timeline_index;
+
+	vk->frame_index = (vk->frame_index + 1) % vk->frame_resources.size();
+	vk->present_id++;
+
+	/*vkWaitForFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence, VK_TRUE, UINT64_MAX);
+
+	//vkQueueWaitIdle(vk->graphics_queue);
+	//times[1] = SDL_GetTicks();
+
+	vkAcquireNextImageKHR(vk->device, vk->swapchain, UINT64_MAX,
+											vk->frame_resources[vk->frame_index].present_semaphore,
+											VK_NULL_HANDLE, &vk->image_index);*/
+	//Log() << vk->image_index << vk->frame_index;
+	//times[2] = SDL_GetTicks();
+
+	if (result != VK_SUCCESS)
+		throw std::runtime_error("Swapchain out of date!!!");
+
+	//Log() << times[1] - times[0] << times[2] - times[1] << times[3] - times[2] << times[4] - times[3] << times[5] - times[4] << times[6] - times[5];
+}
+
 
 
 void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::Clear clear_flags)
@@ -749,9 +959,9 @@ void RenderDeviceVK::SetCullMode(uint32_t mode)
 	VkCullModeFlags cull_mode = VK_CULL_MODE_NONE;
 	switch (mode)
 	{
-		case 1:  cull_mode = VK_CULL_MODE_FRONT_BIT; break;
-		case 2:  cull_mode = VK_CULL_MODE_BACK_BIT; break;
-		case 3:  cull_mode = VK_CULL_MODE_FRONT_AND_BACK; break;
+		case 1: cull_mode = VK_CULL_MODE_FRONT_BIT; break;
+		case 2: cull_mode = VK_CULL_MODE_BACK_BIT; break;
+		case 3: cull_mode = VK_CULL_MODE_FRONT_AND_BACK; break;
 	}
 
 	vkCmdSetCullMode(vk->current_command_buffer, cull_mode);
@@ -774,79 +984,7 @@ void RenderDeviceVK::EndRenderPass(FramebufferID framebuffer_id)
 	}
 }
 
-void RenderDeviceVK::EndFrame()
-{
-	//LayoutTransition({}, ImageLayout::COLOR_ATTACHMENT, ImageLayout::PRESENT);
 
-	vkEndCommandBuffer(vk->current_command_buffer);
-
-	VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-
-	VkSubmitInfo submit_info
-	{
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.pNext = nullptr,
-		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &vk->frame_resources[vk->frame_index].present_semaphore,
-		.pWaitDstStageMask = wait_stages,
-		.commandBufferCount = 1,
-		.pCommandBuffers = &vk->current_command_buffer,
-		.signalSemaphoreCount = 1,
-		.pSignalSemaphores = &vk->swapchain_resources[vk->image_index].render_semaphore,
-	};
-
-	times[3] = SDL_GetTicks();
-	//vkResetFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence);
-	times[4] = SDL_GetTicks();
-	vkQueueSubmit(vk->graphics_queue, 1, &submit_info, vk->frame_resources[vk->frame_index].fence);
-	times[5] = SDL_GetTicks();
-
-	/*VkSemaphoreSubmitInfo wait_semaphore_submit_info
-	{
-		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-		.pNext = nullptr,
-		.semaphore = vk->swapchain_semaphore,
-		.value = 0,
-		.stageMask = 0,
-		.deviceIndex = 0,
-	};
-
-	VkSubmitInfo2 submit_info_2
-	{
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-		.pNext = nullptr,
-		.flags = 0,
-		.waitSemaphoreInfoCount = 1,
-		.pWaitSemaphoreInfos = &wait_semaphore_submit_info,
-		.commandBufferInfoCount = 1,
-		.pCommandBufferInfos = &vk->current_command_buffer,
-		.signalSemaphoreInfoCount = 1,
-		.pSignalSemaphoreInfos = &vk->frames[vk->image_index].render_semaphore,
-	};
-
-	vkQueueSubmit2(vk->graphics_queue, 1, &submit_info_2, vk->fence);*/
-
-	VkResult result;
-	VkPresentInfoKHR present_info
-	{
-		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-		.pNext = nullptr,
-		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &vk->swapchain_resources[vk->image_index].render_semaphore,
-		.swapchainCount = 1,
-		.pSwapchains = &vk->swapchain,
-		.pImageIndices = &vk->image_index,
-		.pResults = &result,
-	};
-
-	vkQueuePresentKHR(vk->graphics_queue, &present_info);
-	times[6] = SDL_GetTicks();
-
-	vk->frame_index = (vk->frame_index + 1) % vk->frame_resources.size();
-	vk->current_command_buffer = vk->frame_resources[vk->frame_index].command_buffer;
-
-	//Log() << times[1] - times[0] << times[2] - times[1] << times[3] - times[2] << times[4] - times[3] << times[5] - times[4] << times[6] - times[5];
-}
 
 void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLayout to)
 {
@@ -1113,6 +1251,10 @@ void RenderDeviceVK::WriteDescriptor(DescriptorSet set, uint32_t binding, GPUBuf
 		.range = value.size,
 	};
 
+	VkDescriptorType type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	if (value.type == GPUBuffer::Type::STORAGE)
+		type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+
 	VkWriteDescriptorSet write_set
 	{
 		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -1121,7 +1263,7 @@ void RenderDeviceVK::WriteDescriptor(DescriptorSet set, uint32_t binding, GPUBuf
 		.dstBinding = binding,
 		.dstArrayElement = 0,
 		.descriptorCount = 1,
-		.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		.descriptorType = type,
 		.pImageInfo = nullptr,
 		.pBufferInfo = &buffer_info,
 		.pTexelBufferView = nullptr,
@@ -1201,9 +1343,9 @@ void RenderDeviceVK::BindDescriptorSet(Descriptor2::Set index, DescriptorSet des
 	//				   offset, sizeof(int), &value);
 }*/
 
-void RenderDeviceVK::PushConstant(uint32_t slot, int value)
+void RenderDeviceVK::PushConstant(EngineConstants slot, int value)
 {
-	vk::ConstantRange &range = store->current_pipeline.constant_ranges.at(slot);
+	vk::ConstantRange &range = store->current_pipeline.constant_ranges.at(uint32_t(slot));
 	if (range.stage_flags == 0 || range.size == 0 || range.size != sizeof(int))
 		throw std::runtime_error("Wrong push constants range");
 
@@ -1211,10 +1353,10 @@ void RenderDeviceVK::PushConstant(uint32_t slot, int value)
 					range.offset, range.size, &value);
 }
 
-void RenderDeviceVK::PushConstant(uint32_t slot, float value)
+void RenderDeviceVK::PushConstant(EngineConstants slot, float value)
 {
 	// TODO: assert range.size == sizeof(float)
-	vk::ConstantRange &range = store->current_pipeline.constant_ranges.at(slot);
+	vk::ConstantRange &range = store->current_pipeline.constant_ranges.at(uint32_t(slot));
 	if (range.stage_flags == 0 || range.size == 0 || range.size != sizeof(float))
 		throw std::runtime_error("Wrong push constants range");
 
@@ -1243,6 +1385,8 @@ void RenderDeviceVK::SetUniform2i(std::array<int, 2> values)
 
 Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc &desc)
 {
+	//Log() << name;
+
 	VkImageUsageFlags usage_flags = 0;
 	if (uint32_t(desc.usage & Texture::Usage::SHADER_READ))
 		usage_flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -1253,7 +1397,7 @@ Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc
 	if (uint32_t(desc.usage & Texture::Usage::DEPTH_ATTACHMENT))
 		usage_flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-	if (desc.pixels != nullptr) // FIXME: should it check for not be COLOR_ATTACHMENT?
+	if (!desc.pixels.empty()) // FIXME: should it check for not be COLOR_ATTACHMENT?
 		usage_flags |= VK_IMAGE_USAGE_HOST_TRANSFER_BIT;
 
 	VkImageCreateInfo image_ci
@@ -1327,7 +1471,7 @@ Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc
 	VkImageView image_view;
 	vkCreateImageView(vk->device, &image_view_ci, nullptr, &image_view);
 
-	if (desc.pixels == nullptr)
+	if (desc.pixels.empty())
 	{
 		store->textures.push_back({ image, image_view, memory, VK_IMAGE_LAYOUT_UNDEFINED });
 		return { { uint32_t(store->textures.size() - 1) }, desc.format };
@@ -1366,7 +1510,7 @@ Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc
 		{
 			.sType = VK_STRUCTURE_TYPE_MEMORY_TO_IMAGE_COPY,
 			.pNext = nullptr,
-			.pHostPointer = (char *)desc.pixels + offset,
+			.pHostPointer = desc.pixels.data() + offset,
 			.memoryRowLength = 0,
 			.memoryImageHeight = 0,
 			.imageSubresource = subresource_layers,
@@ -1400,19 +1544,16 @@ Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc
 FramebufferID RenderDeviceVK::CreateFramebuffer(const FramebufferDesc &desc)
 {
 	// TODO: check attachment_count range
+	// TODO: check width and height less or equal textures width and height
 
 	Framebuffer framebuffer;
 	framebuffer.width = desc.width;
 	framebuffer.height = desc.height;
 	framebuffer.color_textures.resize(desc.color_textures.size());
-	framebuffer.color_formats.resize(desc.color_textures.size());
+	//framebuffer.color_formats.resize(desc.color_textures.size());
 
 	for (uint32_t i = 0; i < desc.color_textures.size(); i++)
-	{
-
-		framebuffer.color_textures[i] = desc.color_textures[i],
-		framebuffer.color_formats[i] = desc.color_textures[i].format;
-	}
+		framebuffer.color_textures[i] = desc.color_textures[i];
 
 	framebuffer.depth_texture = desc.depth_texture;
 
@@ -1427,29 +1568,16 @@ Framebuffer RenderDeviceVK::GetFramebuffer(FramebufferID framebuffer)
 
 uint32_t RenderDeviceVK::GetFrameIndex() const
 {
+	return 0;
 	return vk->frame_index;
 }
 
 uint32_t RenderDeviceVK::GetFrameCount() const
 {
+	return 1;
 	return vk->frame_resources.size();
 }
 
-/*Texture RenderDeviceVK::GetDepthTexture()
-{
-	return vk->depth_texture_fffuuu;
-}*/
-
-/*void RenderDeviceVK::SetDepthTexture(Texture depth_texture)
-{
-	vk->depth_texture = store->textures[depth_texture.handle];
-	vk->depth_texture_fffuuu = depth_texture;
-}*/
-
-/*void RenderDeviceVK::SetDebugName(Texture texture, const char *name)
-{
-	vk->SetObjectName(VK_OBJECT_TYPE_IMAGE, store->textures.at(texture.handle).image, name);
-}*/
 
 
 BF_END_NAMESPACE

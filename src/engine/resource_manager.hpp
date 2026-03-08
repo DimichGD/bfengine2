@@ -4,6 +4,7 @@
 #include "graphics/render_device.hpp"
 #include "graphics/render_paths/graphics_context.hpp"
 #include "graphics/vulkan/vk_render_device.hpp"
+#include "utils/parser.hpp"
 #include <memory>
 #include <string>
 
@@ -61,26 +62,7 @@ private:
 
 struct MaterialID: Handle {};
 
-enum class EngineDescriptor
-{
-	CAMERA_MATRICES,
-	MODEL_MATRICES,
-	MATERIAL_DATA,
-	//CUSTOM_DATA,
-	LIGHT_CAMERA_DATA,
-	POINT_LIGHTS,
-	SPOT_LIGHTS,
-	AREA_LIGHTS,
-	BONE_MATRICES,
-};
 
-enum class EngineConstants
-{
-	OBJECT_INDEX,
-	MATERIAL_INDEX,
-	FACTOR,
-	TIME,
-};
 
 struct TextureInputDesc
 {
@@ -88,23 +70,14 @@ struct TextureInputDesc
 	Texture::Format format;
 };
 
-struct MaterialDefinition
-{
-	std::vector<EngineDescriptor> descriptors;
-	std::vector<EngineConstants> constants;
-	std::unordered_map<std::string, TextureInputDesc> textures;
-	Shader vertex_shader;
-	Shader fragment_shader;
-};
-
 class CustomMaterial: public IMaterial
 {
 public:
-	CustomMaterial(std::string name, MaterialDefinition *definition, const std::vector<Texture> &textures)
+	CustomMaterial(std::string name, const std::vector<Texture> &textures, uint32_t index)
 	{
-		this->def = definition;
 		this->textures = std::move(textures);
 		this->name = name;
+		this->index = index;
 	}
 
 	void Setup(RenderDevice *device, DescriptorSet descriptor_set) override
@@ -114,48 +87,14 @@ public:
 
 	void Setup2(RenderDevice *device, GraphicsContext *context, Descriptor2::Set set_index, DescriptorSet descriptor_set) override
 	{
-		for (uint32_t i = 0; i < def->textures.size(); i++)
+		for (uint32_t i = 0; i < textures.size(); i++)
 			device->WriteDescriptor(descriptor_set, i, textures.at(i));
-
-		/*switch (set_index)
-		{
-			case Descriptor2::Set::SCENE:
-				for (uint32_t i = 0; i < def->descriptors.size(); i++)
-				{
-					switch (def->descriptors[i])
-					{
-
-						case EngineDescriptor::CAMERA_MATRICES:
-							device->WriteDescriptor(descriptor_set, i, context->active_camera_ubo);
-							break;
-
-						case EngineDescriptor::MODEL_MATRICES:
-							device->WriteDescriptor(descriptor_set, i, context->model_matrices_ubo);
-							break;
-
-						default:
-							Log() << "Setup2 switch failed";
-							break;
-					}
-				}
-				break;
-
-			case Descriptor2::Set::MATERIAL:
-				for (uint32_t i = 0; i < def->textures.size(); i++)
-				{
-					device->WriteDescriptor(descriptor_set, i, textures.at(i));
-				}
-				break;
-
-			case Descriptor2::Set::OBJECT:
-				break;
-		}*/
 	}
 
-std::string name;
+	uint32_t index;
+	std::string name;
 
 private:
-	MaterialDefinition *def = nullptr;
 	std::vector<Texture> textures;
 };
 
@@ -185,9 +124,10 @@ public:
 	BF_NON_COPYABLE(ResourceManager)
 	BF_NON_MOVABLE(ResourceManager)
 
-	Texture	LoadKTX2(std::string_view filename, Texture::Format format = Texture::Format::SRGBA8);
+	Texture	LoadKTX2(std::string_view filename);
 	Texture LoadTexture(std::string_view filename, Texture::Format format = Texture::Format::SRGBA8);
 	auto    LoadMaterial(const std::string &name) -> std::shared_ptr<IMaterial>;
+	Shader  LoadShader(const std::string &name);
 
 	Mesh    LoadMesh(std::string_view filename);
 
@@ -195,8 +135,10 @@ private:
 	RenderDevice *device = nullptr;
 	FileSystem *fs = nullptr;
 
+	std::map<std::string, Shader> shader_cache;
+	std::map<std::string, ShaderDesc> shader_descriptions;
 	std::map<std::string, std::shared_ptr<IMaterial>> materials;
-	std::map<std::string, MaterialDefinition> material_descriptions;
+	//std::map<std::string, std::vector<std::pair<std::string, Texture::Format>>> material_defs;
 };
 
 BF_END_NAMESPACE

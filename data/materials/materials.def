@@ -1,0 +1,13 @@
+material "wall/gotbwall4"
+{
+	texture "wall/gotbwall4_d.ktx" srgba
+	texture "wall/gotbwall4_local.ktx" rgba
+	texture "wall/gotbwall4_s.ktx" rgba
+}
+
+material "floor/diafloor"
+{
+	texture "floor/diafloor_d.ktx" srgba
+	texture "floor/diafloor_local.ktx" rgba
+	texture "floor/diafloor_s.ktx" rgba
+}
