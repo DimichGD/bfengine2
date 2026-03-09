@@ -418,6 +418,12 @@ void CreatePipelineLayout(VkDevice device, Pipeline &pipeline,
 				type = Descriptor2::Type::STORAGE_BUFFER;
 
 			Descriptor2 desc(set_index, binding_index, type, 1);
+			if (buffer == EngineDescriptor::TEXTURES)
+			{
+				desc.type = Descriptor2::Type::TEXTURE;
+				desc.array_size = 32;
+			}
+
 			auto it = std::find_if(combined_descriptors[set_index].begin(), combined_descriptors[set_index].end(),
 								   [&desc](const StageDescriptor &other){ return other.descriptor == desc; });
 

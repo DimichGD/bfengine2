@@ -9,10 +9,15 @@ layout(location = 2) out vec4 OUT_COLOR_2;
 
 void main()
 {
-	vec4 D = texture(diffuse_map, TEXCOORD_0);
+	/*vec4 D = texture(diffuse_map, TEXCOORD_0);
 	vec3 N = normalize(texture(normal_map, TEXCOORD_0).xyz * 2.0 - 1.0);
-	vec4 S = texture(specular_map, TEXCOORD_0);
+	vec4 S = texture(specular_map, TEXCOORD_0);*/
 	
+	vec4 D = texture(U_TEXTURES[U_MATERIAL_INDEX + 0], TEXCOORD_0);
+	vec3 N = texture(U_TEXTURES[U_MATERIAL_INDEX + 1], TEXCOORD_0).xyz;
+	vec4 S = texture(U_TEXTURES[U_MATERIAL_INDEX + 2], TEXCOORD_0);
+	
+	N = normalize(N * 2.0 - 1.0);
 	N.x = -N.x;
 	mat3 TBN = mat3(normalize(TANGENT), normalize(BINORMAL), normalize(NORMAL));
 	

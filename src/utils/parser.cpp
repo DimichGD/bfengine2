@@ -96,6 +96,7 @@ ShaderDesc Parser::ReadShader()
 		{ "UI_CAMERA_MATRIX", EngineDescriptor::UI_CAMERA_MATRIX },
 		{ "MODEL_MATRICES", EngineDescriptor::MODEL_MATRICES },
 		{ "COLORS", EngineDescriptor::COLORS },
+		{ "TEXTURES", EngineDescriptor::TEXTURES },
 		//{ "MATERIAL_DATA", EngineDescriptor::MATERIAL_DATA },
 		{ "LIGHT_CAMERA_DATA", EngineDescriptor::LIGHT_CAMERA_DATA },
 		{ "POINT_LIGHTS", EngineDescriptor::POINT_LIGHTS },
@@ -191,8 +192,12 @@ ShaderDesc Parser::ReadShader()
 				break;
 
 			case Keyword::TEXTURE:
-				shader.textures.push_back(std::string(Next()->GetLiteral()));
+			{
+				std::string name = std::string(Next()->GetLiteral());
+				uint32_t samples = Next()->GetLiteral() == "1" ? 1 : 4; // TODO: check type
+				shader.textures.emplace_back(name, samples);
 				break;
+			}
 
 			default:
 				throw std::runtime_error("Unexpected KEYWORD");

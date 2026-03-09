@@ -47,9 +47,9 @@ public:
 
 	void Setup(RenderDevice *device, DescriptorSet descriptor_set) override
 	{
-		device->WriteDescriptor(descriptor_set, 0, diffuse_map);
-		device->WriteDescriptor(descriptor_set, 1, normal_map);
-		device->WriteDescriptor(descriptor_set, 2, specular_map);
+		device->WriteDescriptor(descriptor_set, 0, diffuse_map, 0);
+		device->WriteDescriptor(descriptor_set, 0, normal_map, 1);
+		device->WriteDescriptor(descriptor_set, 0, specular_map, 2);
 	}
 
 private:
@@ -87,8 +87,11 @@ public:
 
 	void Setup2(RenderDevice *device, GraphicsContext *context, Descriptor2::Set set_index, DescriptorSet descriptor_set) override
 	{
+		// for (uint32_t i = 0; i < textures.size(); i++)
+		// 	device->WriteDescriptor(descriptor_set, i, textures.at(i));
+
 		for (uint32_t i = 0; i < textures.size(); i++)
-			device->WriteDescriptor(descriptor_set, i, textures.at(i));
+			device->WriteDescriptor(descriptor_set, 0, textures.at(i), index + i);
 	}
 
 	uint32_t index;

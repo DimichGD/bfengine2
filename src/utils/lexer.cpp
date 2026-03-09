@@ -45,7 +45,9 @@ bool Lexer::Parse()
 				break;
 
 			default:
-				if (IsAlpha(*current))
+				if (IsDigit(*current))
+					ParseNumber();
+				else if (IsAlpha(*current))
 					ParseIdentifier();
 				else
 					Error() << "Parsing error at line" << line << "character" << *current;
@@ -102,6 +104,23 @@ void Lexer::ParseString()
 		Error() << "end of file";
 
 	AddToken(Token::Type::STRING, { start, current });
+}
+
+void Lexer::ParseNumber()
+{
+	auto start = current;
+	while ((current + 1) != end && IsDigit(*(current + 1)))
+		++current;
+
+	if (*(current + 1) == '.' && IsDigit(*(current + 2))) // TODO: check *(current + 2) for overflow
+	{
+		++current;
+
+		while ((current + 1) != end && IsDigit(*(current + 1)))
+			++current;
+	}
+
+	AddToken(Token::Type::NUMBER, { start, current + 1 });
 }
 
 void Lexer::AddToken(Token::Type type)

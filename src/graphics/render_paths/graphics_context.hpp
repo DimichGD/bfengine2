@@ -16,6 +16,7 @@ struct GraphicsContext
 	FramebufferID gbuffer {};
 
 	Texture final_texture {};
+	//Texture final_depth {};
 	FramebufferID final_fbo {};
 
 	GPUBuffer text_vbo {};

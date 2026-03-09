@@ -26,6 +26,7 @@ ResourceManager::ResourceManager(RenderDevice *device, FileSystem *fs)
 	buffer = mat_file.Read();
 	Parser parser2(buffer);
 	//material_defs.merge(parser2.DoStuff2());
+	uint32_t mat_index = 0;
 	for (auto mat: parser2.DoStuff2())
 	{
 		std::vector<Texture> textures;
@@ -33,7 +34,9 @@ ResourceManager::ResourceManager(RenderDevice *device, FileSystem *fs)
 		for (auto tex: mat.second)
 			textures.push_back(LoadTexture(tex.first, tex.second));
 
-		materials[mat.first] = std::make_shared<CustomMaterial>(mat.first, std::move(textures), 0);
+		materials[mat.first] = std::make_shared<CustomMaterial>(mat.first, std::move(textures), mat_index);
+
+		mat_index += 3;
 	}
 
 	std::string material_name = "red.png";
@@ -249,7 +252,7 @@ Shader ResourceManager::LoadShader(const std::string &name)
 
 	File source_file(fs->GetDataPath() + "shaders/" + desc_it->second.filename);
 	File cache_file(fs->GetDataPath() + "shaders/cache/" + cache_name);
-	if (cache_file.Open() && cache_file.LastWriteTime() >= source_file.LastWriteTime())
+	if (cache_file.Open() && cache_file.LastWriteTime() > source_file.LastWriteTime())
 	{
 		std::vector<uint32_t> binary(cache_file.Size() / sizeof(uint32_t));
 		cache_file.Read(binary.data(), cache_file.Size());

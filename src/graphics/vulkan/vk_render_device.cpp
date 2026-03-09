@@ -97,7 +97,7 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 	//Log() << props.limits.minUniformBufferOffsetAlignment;
 
 
-	vk->frame_resources.resize(3);
+	vk->frame_resources.resize(2);
 
 	VkSemaphoreTypeCreateInfoKHR semaphore_type_ci
 	{
@@ -228,7 +228,7 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 	{
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
 		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100 },
-		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
 	};
 
 	VkDescriptorPoolCreateInfo descritor_pool_ci
@@ -462,6 +462,8 @@ Shader RenderDeviceVK::LoadShader(Shader::Type type, const std::string &name)
 
 Shader RenderDeviceVK::LoadShader(const std::string &name, const ShaderDesc &desc)
 {
+	Log() << "Create shader cache for" << name;
+
 	File source_file(fs->GetDataPath() + "shaders/" + desc.filename);
 	source_file.Open();
 
@@ -636,7 +638,7 @@ void RenderDeviceVK::BeginFrame()
 	//Log() << vk->present_id;
 
 	if (vk->present_id > vk->swapchain_resources.size())
-		vk->WaitForPresentKHR(vk->device, vk->swapchain, vk->present_id - 2, UINT64_MAX);
+		vk->WaitForPresentKHR(vk->device, vk->swapchain, vk->present_id - 1, UINT64_MAX);
 
 
 	vkWaitForFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence, VK_TRUE, UINT64_MAX);
@@ -686,6 +688,7 @@ void RenderDeviceVK::BeginFrame()
 
 	//swapchain_image_prev_layouts[vk->image_index] = ImageLayout::UNDEFINED;
 }
+
 
 void RenderDeviceVK::EndFrame()
 {
@@ -833,9 +836,12 @@ void RenderDeviceVK::EndFrame()
 	//Log() << times[1] - times[0] << times[2] - times[1] << times[3] - times[2] << times[4] - times[3] << times[5] - times[4] << times[6] - times[5];
 }
 
-
-
 void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::Clear clear_flags)
+{
+	BeginRenderPass(framebuffer_id, clear_flags, {});
+}
+
+void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::Clear clear_flags, Texture resolve_depth)
 {
 	/*if (framebuffer_id)
 	{
@@ -861,6 +867,7 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 	VkImageView depth_image_view;
 	VkImageLayout depth_layout;
 	uint32_t width, height;
+	//VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 
 	if (framebuffer_id)
 	{
@@ -920,6 +927,13 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 		.clearValue = { .depthStencil = vk->clear_depth_stencil },
 	};
+
+	if (resolve_depth)
+	{
+		depth_attachment.resolveMode = VK_RESOLVE_MODE_MIN_BIT;
+		depth_attachment.resolveImageView = store->textures[resolve_depth.handle].image_view;
+		depth_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+	}
 
 
 	VkRenderingInfo rendering_info =
@@ -1122,6 +1136,47 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 	vk_texture->layout = vk::ConvertEnum(to);
 }
 
+void RenderDeviceVK::LayoutTransition2(Texture texture, uint32_t step)
+{
+	VkImageMemoryBarrier2 barrier;
+	VkImageSubresourceRange subresource_range = vk->generic_subresource;
+	subresource_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+
+	if (step == 0)
+	{
+		barrier = VkImageMemoryBarrier2
+		{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+			.pNext = nullptr,
+			.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+			.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+			.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
+			.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+			.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = store->textures[texture.handle].image,
+			.subresourceRange = subresource_range,
+		};
+	}
+
+	VkDependencyInfo dependency_info
+	{
+		.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+		.pNext = nullptr,
+		.dependencyFlags = 0,
+		.memoryBarrierCount = 0,
+		.pMemoryBarriers = nullptr,
+		.bufferMemoryBarrierCount = 0,
+		.pBufferMemoryBarriers = nullptr,
+		.imageMemoryBarrierCount = 1,
+		.pImageMemoryBarriers = &barrier,
+	};
+
+	vkCmdPipelineBarrier2(vk->current_command_buffer, &dependency_info);
+}
+
 GPUBuffer RenderDeviceVK::CreateBuffer(GPUBuffer::Type type, uint32_t size, const void *data) // TODO: handle data pointer
 {
 	assert(size > 0);
@@ -1295,6 +1350,7 @@ void RenderDeviceVK::WriteDescriptor(DescriptorSet set, uint32_t binding, Textur
 		layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		vkCreateImageView(vk->device, &image_view_ci, nullptr, &image_view);
+		vk->SetObjectName(VK_OBJECT_TYPE_IMAGE_VIEW, image_view, "Some depth view");
 	}
 
 	VkDescriptorImageInfo image_info
@@ -1410,7 +1466,7 @@ Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc
 		.extent = { desc.width, desc.height, 1 },
 		.mipLevels = desc.levels,
 		.arrayLayers = 1,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.samples = VkSampleCountFlagBits(desc.samples), //VK_SAMPLE_COUNT_1_BIT,
 		.tiling = VK_IMAGE_TILING_OPTIMAL,
 		.usage = usage_flags, // /*VK_IMAGE_USAGE_TRANSFER_DST_BIT |*/ VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_HOST_TRANSFER_BIT,
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -1549,6 +1605,7 @@ FramebufferID RenderDeviceVK::CreateFramebuffer(const FramebufferDesc &desc)
 	Framebuffer framebuffer;
 	framebuffer.width = desc.width;
 	framebuffer.height = desc.height;
+	framebuffer.samples = desc.samples;
 	framebuffer.color_textures.resize(desc.color_textures.size());
 	//framebuffer.color_formats.resize(desc.color_textures.size());
 
@@ -1568,13 +1625,11 @@ Framebuffer RenderDeviceVK::GetFramebuffer(FramebufferID framebuffer)
 
 uint32_t RenderDeviceVK::GetFrameIndex() const
 {
-	return 0;
 	return vk->frame_index;
 }
 
 uint32_t RenderDeviceVK::GetFrameCount() const
 {
-	return 1;
 	return vk->frame_resources.size();
 }
 

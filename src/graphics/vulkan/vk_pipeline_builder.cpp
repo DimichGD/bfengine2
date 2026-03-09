@@ -17,10 +17,10 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder(VkDevice device)
 
 void GraphicsPipelineBuilder::SetVertexFormat(Vertex::Attrib attribs)
 {	
-	vertex_input.attribs.reserve(std::popcount(uint32_t(attribs)));
+	vertex_input.attribs.reserve(std::popcount(std::to_underlying(attribs)));
 
 	uint32_t offset = 0;
-	for (uint32_t i = 0; i < 8; i++)
+	for (uint32_t i = 0; i < 8; i++) // FIXME: 8 is hardcoded
 	{
 		if (attribs & (1 << i))
 		{
@@ -82,6 +82,9 @@ void GraphicsPipelineBuilder::SetSwapchainFormat(VkFormat color_format, VkFormat
 
 void GraphicsPipelineBuilder::SetFramebuffer(const Framebuffer &framebuffer)
 {
+	if (!framebuffer.color_textures.empty() && framebuffer.samples > 1)
+		samples = VK_SAMPLE_COUNT_4_BIT;
+
 	attachment_formats.reserve(framebuffer.color_textures.size());
 	for (auto texture: framebuffer.color_textures)
 		attachment_formats.push_back(vk::ConvertEnum(texture.format));
@@ -156,13 +159,13 @@ VkPipeline GraphicsPipelineBuilder::Build(VkDevice device, VkPipelineCache pipel
 		.lineWidth = 1.0f
 	};
 
-	uint32_t sample_mask = 1;
+	uint32_t sample_mask = UINT32_MAX;
 	VkPipelineMultisampleStateCreateInfo multisample_ci =
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+		.rasterizationSamples = samples,
 		.sampleShadingEnable = VK_FALSE,
 		.minSampleShading = 1.0f,
 		.pSampleMask = &sample_mask, // TODO: is it correct?

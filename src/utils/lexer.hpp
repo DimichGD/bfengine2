@@ -99,6 +99,7 @@ public:
 protected:
 	void ParseIdentifier();
 	void ParseString();
+	void ParseNumber();
 
 	void AddToken(Token::Type type);
 	void AddToken(Token::Type type, std::string_view literal);

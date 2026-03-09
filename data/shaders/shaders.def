@@ -42,7 +42,7 @@ shader "general fragment texture"
 {
 	type fragment
 	file "generic/texture_frag.glsl"
-	texture diffuse_map
+	texture diffuse_map 1
 }
 
 shader "general fragment color"
@@ -59,16 +59,15 @@ shader "general fragment texture color"
 	file "generic/ui_texture_frag.glsl"
 	buffer COLORS
 	constant MATERIAL_INDEX
-	texture diffuse_map
+	texture diffuse_map 1
 }
 
 shader "deferred fragment diffuse normal specular"
 {
 	type fragment
 	file "deferred/gbuffer_normal_spec_frag.glsl"
-	texture diffuse_map
-	texture normal_map
-	texture specular_map
+	buffer TEXTURES
+	constant MATERIAL_INDEX
 }
 
 shader "deferred vertex point_light"
@@ -87,9 +86,9 @@ shader "deferred fragment point_light phong"
 	file "deferred/point_light_frag.glsl"
 	buffer LIGHT_CAMERA_DATA
 	buffer POINT_LIGHTS
-	texture diffuse_map
-	texture normal_map
-	texture specular_map
-	texture depth_map
+	texture diffuse_map 1
+	texture normal_map 1
+	texture specular_map 1
+	texture depth_map 1
 	constant MATERIAL_INDEX
 }

@@ -34,7 +34,7 @@ struct Pipeline
 	VkPipeline pipeline;
 	VkPipelineLayout layout;
 	std::vector<VkDescriptorSetLayout> decriptor_set_layouts;
-	std::array<ConstantRange, 4> constant_ranges {};
+	std::array<ConstantRange, 6> constant_ranges {};
 };
 
 BF_END_VK_NAMESPACE

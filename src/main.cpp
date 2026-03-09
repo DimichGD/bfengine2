@@ -84,6 +84,7 @@ int main()
 		.format = Texture::Format::RGBA16F,
 		.usage = Texture::Usage::COLOR_ATTACHMENT | Texture::Usage::SHADER_READ,
 		.levels = 1,
+		.samples = 1,
 		.pixels = {},
 		.generate_mipmaps = false,
 	};
@@ -95,9 +96,34 @@ int main()
 		.format = Texture::Format::D24S8,
 		.usage = Texture::Usage::DEPTH_ATTACHMENT | Texture::Usage::SHADER_READ,
 		.levels = 1,
+		.samples = 1,
 		.pixels = {},
 		.generate_mipmaps = false,
 	};
+
+	TextureDesc final_texture_desc
+	{
+		.width = config.window.width,
+		.height = config.window.height,
+		.format = Texture::Format::RGBA16F,
+		.usage = Texture::Usage::COLOR_ATTACHMENT | Texture::Usage::SHADER_READ,
+		.levels = 1,
+		.pixels = {},
+		.generate_mipmaps = false,
+	};
+
+	TextureDesc final_depth_desc
+	{
+		.width = config.window.width,
+		.height = config.window.height,
+		.format = Texture::Format::D24S8,
+		.usage = Texture::Usage::DEPTH_ATTACHMENT | Texture::Usage::SHADER_READ,
+		.levels = 1,
+		.samples = 1,
+		.pixels = {},
+		.generate_mipmaps = false,
+	};
+
 
 	/*std::vector<Texture> gbuffer_textures
 	{
@@ -146,18 +172,21 @@ int main()
 		{
 			.width = config.window.width,
 			.height = config.window.height,
+			.samples = 1,
 			.color_textures = context.gbuffer_textures,
 			.depth_texture = context.gbuffer_depth,
 		};
 
 		context.gbuffer = device->CreateFramebuffer(framebuffer_desc);
 
-		context.final_texture = device->CreateTexture(fmt::format("Final Render Target frame {}", frame_index), color_desc);
+		context.final_texture = device->CreateTexture(fmt::format("Final Render Target frame {}", frame_index), final_texture_desc);
+		//context.final_depth = device->CreateTexture(fmt::format("Final Depth frame {}", frame_index), final_depth_desc);
 
 		FramebufferDesc final_fbo_desc
 		{
 			.width = config.window.width,
 			.height = config.window.height,
+			.samples = 1,
 			.color_textures = { context.final_texture },
 			.depth_texture = context.gbuffer_depth,
 		};
@@ -557,6 +586,8 @@ int main()
 		device->LayoutTransition(context->gbuffer_textures[2], ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
 		device->LayoutTransition(context->gbuffer_depth, ImageLayout::UNDEFINED, ImageLayout::DEPTH_STENCIL_ATTACHMENT);
 		device->LayoutTransition(context->final_texture, ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
+		//device->LayoutTransition(context->final_depth, ImageLayout::UNDEFINED, ImageLayout::DEPTH_STENCIL_ATTACHMENT);
+		//device->LayoutTransition2(context->final_depth, 0);
 		device->LayoutTransition({}, ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
 
 		device->BeginRenderPass(context->gbuffer, RenderPass::Clear::COLOR_DEPTH);
@@ -574,6 +605,8 @@ int main()
 		device->LayoutTransition(context->gbuffer_textures[1], ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
 		device->LayoutTransition(context->gbuffer_textures[2], ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
 		device->LayoutTransition(context->gbuffer_depth, ImageLayout::DEPTH_STENCIL_ATTACHMENT, ImageLayout::DEPTH_STENCIL_READ_ONLY);
+		//device->LayoutTransition2(context->final_depth, 1);
+		//device->LayoutTransition(context->final_depth, ImageLayout::DEPTH_STENCIL_ATTACHMENT, ImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
 		device->BeginRenderPass(context->final_fbo, RenderPass::Clear::COLOR);
 		device->SetCullMode(1);

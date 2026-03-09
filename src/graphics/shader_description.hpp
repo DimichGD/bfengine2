@@ -29,6 +29,7 @@ enum class EngineDescriptor
 	UI_CAMERA_MATRIX,
 	MODEL_MATRICES,
 	COLORS,
+	TEXTURES,
 	//MATERIAL_DATA,
 	//CUSTOM_DATA,
 	LIGHT_CAMERA_DATA,
@@ -46,6 +47,12 @@ enum class EngineConstants
 	TIME,
 };
 
+struct TextureInput
+{
+	std::string name;
+	uint32_t samples;
+};
+
 struct ShaderDesc // change to definition?
 {
 	bf::Shader::Type type;
@@ -54,7 +61,7 @@ struct ShaderDesc // change to definition?
 	std::vector<EngineUniform> uniforms;
 	std::vector<EngineDescriptor> buffers;
 	std::vector<EngineConstants> constants;
-	std::vector<std::string> textures;
+	std::vector<TextureInput> textures;
 };
 
 static uint32_t GetDescriptorSet(EngineDescriptor desc)
@@ -65,6 +72,7 @@ static uint32_t GetDescriptorSet(EngineDescriptor desc)
 		case EngineDescriptor::UI_CAMERA_MATRIX: return 0;
 		case EngineDescriptor::MODEL_MATRICES: return 0;
 		case EngineDescriptor::COLORS: return 0;
+		case EngineDescriptor::TEXTURES: return 1;
 		//case EngineDescriptor::MATERIAL_DATA: return 1;
 		case EngineDescriptor::LIGHT_CAMERA_DATA: return 0;
 		case EngineDescriptor::POINT_LIGHTS: return 0;
@@ -82,6 +90,7 @@ static uint32_t GetDescriptorBinding(EngineDescriptor desc)
 		case EngineDescriptor::UI_CAMERA_MATRIX: return 0;
 		case EngineDescriptor::MODEL_MATRICES: return 1;
 		case EngineDescriptor::COLORS: return 2;
+		case EngineDescriptor::TEXTURES: return 0;
 		//case EngineDescriptor::MATERIAL_DATA: return 0;
 		case EngineDescriptor::LIGHT_CAMERA_DATA: return 3;
 		case EngineDescriptor::POINT_LIGHTS: return 4;

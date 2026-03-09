@@ -39,6 +39,8 @@ void Deferred::Create(std::vector<GraphicsContext> &context, FramebufferID out_f
 		device->WriteDescriptor(scene_set[i], 0, context[i].active_camera_ubo);
 		device->WriteDescriptor(scene_set[i], 1, context[i].model_matrices_ubo);
 	}
+
+	material_set = device->CreateDescriptorSet(pipeline, Descriptor2::Set::MATERIAL);
 }
 
 void Deferred::Destroy()
@@ -52,7 +54,7 @@ void Deferred::Render(std::vector<Mesh> &meshes, uint32_t current_index)
 
 	device->BindPipeline(pipeline);
 	device->BindDescriptorSet(Descriptor2::Set::SCENE, scene_set[current_index]);
-	//device->BindDescriptorSet(Descriptor2::Set::MATERIAL, context->material_set);
+	device->BindDescriptorSet(Descriptor2::Set::MATERIAL, material_set);
 
 	for (auto &mesh: meshes)
 	{
@@ -68,8 +70,10 @@ void Deferred::Render(std::vector<Mesh> &meshes, uint32_t current_index)
 			//	surf.material->Setup(device, device->CreateDescriptorSet(pipeline, Descriptor2::Set::MATERIAL));
 			if (!surf.descriptor_set)
 			{
-				surf.descriptor_set = device->CreateDescriptorSet(pipeline, Descriptor2::Set::MATERIAL);
-				surf.material->Setup2(device, nullptr, Descriptor2::Set::MATERIAL, surf.descriptor_set);
+				//surf.descriptor_set = device->CreateDescriptorSet(pipeline, Descriptor2::Set::MATERIAL);
+				//surf.material->Setup2(device, nullptr, Descriptor2::Set::MATERIAL, surf.descriptor_set);
+				surf.material->Setup2(device, nullptr, Descriptor2::Set::MATERIAL, material_set);
+
 				//std::static_pointer_cast<CustomMaterial>(surf.material)->Setup2(device, nullptr, Descriptor2::Set::MATERIAL, surf.descriptor_set);
 				/*std::static_pointer_cast<CustomMaterial>(surf.material)->Setup2(device, nullptr, Descriptor2::Set::SCENE, scene_set[0]);
 				std::static_pointer_cast<CustomMaterial>(surf.material)->Setup2(device, nullptr, Descriptor2::Set::SCENE, scene_set[1]);
@@ -77,7 +81,10 @@ void Deferred::Render(std::vector<Mesh> &meshes, uint32_t current_index)
 			}
 
 			//surf.material->Bind(device);
-			device->BindDescriptorSet(Descriptor2::Set::MATERIAL, surf.descriptor_set);
+			//device->BindDescriptorSet(Descriptor2::Set::MATERIAL, surf.descriptor_set);
+			device->PushConstant(EngineConstants::MATERIAL_INDEX, int(std::static_pointer_cast<CustomMaterial>(surf.material)->index));
+			//device->PushConstant(EngineConstants::TEXTURE_1, int(std::static_pointer_cast<CustomMaterial>(surf.material)->index + 1));
+			//device->PushConstant(EngineConstants::TEXTURE_2, int(std::static_pointer_cast<CustomMaterial>(surf.material)->index + 2));
 			device->Draw(surf.vertex_range.start, surf.vertex_range.count);
 		}
 	}

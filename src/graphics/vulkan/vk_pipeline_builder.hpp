@@ -45,6 +45,7 @@ private:
 	VkPrimitiveTopology topology;
 	std::vector<VkFormat> attachment_formats;
 	VkFormat depth_format = VK_FORMAT_UNDEFINED;
+	VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 	//VkFormat swapchain_format = VK_FORMAT_UNDEFINED;
 
 	VkCompareOp depth_compare_op = VK_COMPARE_OP_LESS;

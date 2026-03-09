@@ -33,11 +33,13 @@ public:
 
 	void BeginFrame() override;
 	void BeginRenderPass(FramebufferID framebuffer_id, RenderPass::Clear clear_flags) override;
+	void BeginRenderPass(FramebufferID framebuffer_id, RenderPass::Clear clear_flags, Texture resolve_depth);
 	void SetViewport(glm::ivec4 viewport);
 	void SetCullMode(uint32_t mode) override;
 	void EndRenderPass(FramebufferID framebuffer_id) override;
 	void EndFrame() override;
 	void LayoutTransition(Texture texture, ImageLayout from, ImageLayout to) override;
+	void LayoutTransition2(Texture texture, uint32_t step);
 
 	GPUBuffer CreateBuffer(GPUBuffer::Type type, uint32_t size, const void *data = nullptr) override;
 	void UpdateBuffer(GPUBuffer buffer, uint32_t size, const void *data, uint32_t offset) override;

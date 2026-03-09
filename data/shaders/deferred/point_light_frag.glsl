@@ -15,7 +15,7 @@ void main()
 	vec3 diffuse  = texelFetch(diffuse_map,  ivec2(gl_FragCoord.xy), 0).xyz;
 	vec3 normal   = texelFetch(normal_map,   ivec2(gl_FragCoord.xy), 0).xyz;
 	vec3 specular = texelFetch(specular_map, ivec2(gl_FragCoord.xy), 0).xyz;
-	
+
 	vec3 light_pos = U_POINT_LIGHTS[U_MATERIAL_INDEX].xyz;
 	float radius = U_POINT_LIGHTS[U_MATERIAL_INDEX].w;
 	

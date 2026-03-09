@@ -460,6 +460,7 @@ struct TextureDesc
 	Texture::Format format {};
 	Texture::Usage usage {};
 	uint32_t levels = 0;
+	uint32_t samples = 1;
 	//void *pixels = nullptr;
 	std::vector<char> pixels {};
 	bool generate_mipmaps = false;
@@ -467,22 +468,10 @@ struct TextureDesc
 
 struct Framebuffer
 {
-	/*enum class Attachment
-	{
-		COLOR_0,
-		COLOR_1,
-		COLOR_2,
-		COLOR_3,
-		COLOR_4,
-		COLOR_5,
-		COLOR_6,
-		COLOR_7,
-		DEPTH_STENCIL,
-	};*/
-
 	std::vector<Texture> color_textures;
 	//std::vector<Texture::Format> color_formats;
 	Texture depth_texture {};
+	uint32_t samples = 1;
 	uint32_t width = 0;
 	uint32_t height = 0;
 };
@@ -493,6 +482,7 @@ struct FramebufferDesc
 {
 	uint32_t width = 0;
 	uint32_t height = 0;
+	uint32_t samples = 1;
 	std::vector<Texture> color_textures {};
 	Texture depth_texture {};
 };

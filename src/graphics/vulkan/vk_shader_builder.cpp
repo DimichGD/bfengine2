@@ -1,4 +1,5 @@
 #include "vk_shader_builder.hpp"
+#include "core/log.hpp"
 #include <fmt/format.h>
 #include <sstream>
 
@@ -87,6 +88,7 @@ std::string UniformBufferString(EngineDescriptor desc)
 		case EngineDescriptor::UI_CAMERA_MATRIX: return ui_camera_matrix_text;
 		case EngineDescriptor::MODEL_MATRICES: return model_matrices_text;
 		case EngineDescriptor::COLORS: return colors_text;
+		case EngineDescriptor::TEXTURES: return "layout(set = 1, binding = 0) uniform sampler2D U_TEXTURES[32];\n";
 		case EngineDescriptor::LIGHT_CAMERA_DATA: return camera_data_text;
 		case EngineDescriptor::POINT_LIGHTS: return point_light_text;
 		//case EngineDescriptor::SPOT_LIGHTS: return { 0, 0, "Lights", "" };
@@ -163,7 +165,11 @@ std::string GetShaderString(const ShaderDesc &desc)
 
 	for (uint32_t i = 0; i < desc.textures.size(); i++)
 	{
-		ss << fmt::format("layout(set = 1, binding = {}) uniform sampler2D {};\n", i, desc.textures[i]);
+		if (desc.textures[i].samples == 1)
+			ss << fmt::format("layout(set = 1, binding = {}) uniform sampler2D {};\n", i, desc.textures[i].name);
+
+		else
+			ss << fmt::format("layout(set = 1, binding = {}) uniform sampler2DMS {};\n", i, desc.textures[i].name);
 	}
 
 	ss << "\n";
