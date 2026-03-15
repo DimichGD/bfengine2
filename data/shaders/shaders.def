@@ -66,8 +66,9 @@ shader "deferred fragment diffuse normal specular"
 {
 	type fragment
 	file "deferred/gbuffer_normal_spec_frag.glsl"
-	buffer TEXTURES
-	constant MATERIAL_INDEX
+	texture diffuse_map 1
+	texture normal_map 1
+	texture specular_map 1
 }
 
 shader "deferred vertex point_light"

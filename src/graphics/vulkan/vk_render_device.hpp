@@ -2,6 +2,7 @@
 #include "core/config.hpp"
 #include "graphics/render_device.hpp"
 #include "graphics/shader_description.hpp"
+#include "graphics/render_paths/graphics_context.hpp"
 #include "io/file.hpp"
 
 struct SDL_Window;
@@ -82,6 +83,11 @@ public:
 
 	uint32_t GetFrameIndex() const;
 	uint32_t GetFrameCount() const;
+	//uint32_t RegisterTextures(const std::vector<Texture> &textures);
+	//void CreateTextureSet();
+	//void CreateVertexSet();
+	void RegisterMaterial(uint32_t type, const std::vector<Descriptor2> &descriptors);
+	DescriptorSet CreateMaterialDescriptorSet(uint32_t type);
 	//Texture GetDepthTexture();
 	//void SetDepthTexture(Texture depth_texture);
 
@@ -99,6 +105,10 @@ private:
 
 	uint32_t times[32] {};
 
+	const uint32_t frames_in_flight = 2;
+	//GraphicsData graphics_data;
+
+	//uint32_t textures_set_last_index = 0;
 	std::map<uint32_t, ShaderDesc> shader_desc_map;
 
 	//std::map<Handle, TrackedResource> tracked_resources;

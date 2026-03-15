@@ -121,6 +121,21 @@ void RenderDeviceVK::Internal::ChoosePhysicalDevice()
 		throw std::runtime_error("Physical device not found");
 
 	vkGetPhysicalDeviceMemoryProperties(phys_device, &memory_properties);
+
+	/*VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_props {};
+	descriptor_buffer_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_PROPERTIES_EXT;
+
+	VkPhysicalDeviceProperties2 props
+	{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+		.pNext = &descriptor_buffer_props,
+		.properties = {},
+	};
+	vkGetPhysicalDeviceProperties2(phys_device, &props);
+
+	Log() << descriptor_buffer_props.descriptorBufferOffsetAlignment;*/
+
+	//Log() << props.properties.limits.minUniformBufferOffsetAlignment << props.properties.limits.minStorageBufferOffsetAlignment;
 }
 
 void RenderDeviceVK::Internal::CreateSurface(SDL_Window *wnd)
@@ -205,16 +220,27 @@ void RenderDeviceVK::Internal::CreateDevice()
 		VK_KHR_PRESENT_ID_EXTENSION_NAME,
 		VK_KHR_PRESENT_WAIT_EXTENSION_NAME,
 		VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
+		VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
 	};
 
 	/*VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT device_pipeline_library {};
 	device_pipeline_library.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT;
 	device_pipeline_library.graphicsPipelineLibrary = VK_TRUE;*/
 
+	VkPhysicalDeviceDescriptorBufferFeaturesEXT decriptor_buffer_fratures
+	{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
+		.pNext = nullptr,
+		.descriptorBuffer = VK_TRUE,
+		.descriptorBufferCaptureReplay = VK_TRUE,
+		.descriptorBufferImageLayoutIgnored = VK_FALSE,
+		.descriptorBufferPushDescriptors = VK_FALSE,
+	};
+
 	VkPhysicalDevicePresentWaitFeaturesKHR present_wait_features
 	{
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_WAIT_FEATURES_KHR,
-		.pNext = nullptr,
+		.pNext = &decriptor_buffer_fratures,
 		.presentWait = VK_TRUE,
 	};
 
@@ -256,6 +282,7 @@ void RenderDeviceVK::Internal::CreateDevice()
 	VkPhysicalDeviceFeatures2 phys_device_features {};
 	phys_device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 	phys_device_features.pNext = &device_features_1_2;
+	phys_device_features.features.sampleRateShading = VK_TRUE;
 	//phys_device_features.features.samplerAnisotropy = VK_TRUE;
 	//phys_device_features.features.shaderUniformBufferArrayDynamicIndexing = VK_TRUE;
 	//phys_device_features.features.multiDrawIndirect = VK_TRUE;

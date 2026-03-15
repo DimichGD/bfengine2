@@ -45,6 +45,7 @@ HEADERS += \
     src/core/log.hpp \
     src/engine/resource_manager.hpp \
     src/entities/transform.hpp \
+    src/graphics/frame_graph.hpp \
     src/graphics/geometry.hpp \
     src/graphics/opengl/convert_enum_gl.hpp \
     src/graphics/opengl/opengl_gen.hpp \

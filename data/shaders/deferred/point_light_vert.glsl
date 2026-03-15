@@ -1,3 +1,23 @@
+#version 460 core
+
+layout(location = 0) in vec3 IN_POSITION;
+
+layout(std140, set = 0, binding = 0) uniform Camera
+{
+	mat4 U_PROJ_MATRIX;
+	mat4 U_VIEW_MATRIX;
+};
+
+layout(std140, set = 0, binding = 1) uniform Matrices
+{
+	mat4 U_MODEL_MATRICES[32];
+};
+
+layout(push_constant) uniform Constants
+{
+	layout(offset = 0) int U_OBJECT_INDEX;
+};
+
 layout(location = 0) out vec2 SCREEN_POSITION;
 
 void main()

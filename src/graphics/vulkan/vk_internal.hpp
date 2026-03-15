@@ -1,6 +1,9 @@
 #pragma once
 #include "core/defines.hpp"
+#include "core/log.hpp"
+#include "graphics/vulkan/vk_convert_enum.hpp"
 #include "graphics/vulkan/vk_render_device.hpp"
+#include "utils/hash.hpp"
 #include <SDL3/SDL_video.h>
 #include <vulkan/vulkan.h>
 #include <vector>
@@ -35,6 +38,7 @@ struct Pipeline
 	VkPipelineLayout layout;
 	std::vector<VkDescriptorSetLayout> decriptor_set_layouts;
 	std::array<ConstantRange, 6> constant_ranges {};
+	std::vector<DescriptorSet> descriptors;
 };
 
 BF_END_VK_NAMESPACE
@@ -140,8 +144,8 @@ struct RenderDeviceVK::Internal
 	uint32_t staging_memory_type_index = 5;*/
 	VkPhysicalDeviceMemoryProperties memory_properties {};
 
-	VkBuffer staging_buffer = VK_NULL_HANDLE;
-	VkDeviceMemory staging_memory = VK_NULL_HANDLE;
+	//VkBuffer staging_buffer = VK_NULL_HANDLE;
+	//VkDeviceMemory staging_memory = VK_NULL_HANDLE;
 	VkSampler linear_sampler = VK_NULL_HANDLE;
 
 	VkCommandBuffer transfer_command_buffer = VK_NULL_HANDLE;
@@ -163,6 +167,72 @@ struct RenderDeviceVK::Internal
 	//
 
 	void SetObjectName(VkObjectType object_type, void *object_handle, const char *name);
+};
+
+class DescriptorSetLayoutBuilder
+{
+public:
+	DescriptorSetLayoutBuilder &AddBinding(uint32_t binding_index, VkDescriptorType type, VkShaderStageFlags stage_flags, uint32_t array_size = 1)
+	{
+		VkDescriptorSetLayoutBinding binding
+		{
+			.binding = binding_index,
+			.descriptorType = type,
+			.descriptorCount = array_size,
+			.stageFlags = stage_flags,
+			.pImmutableSamplers = nullptr,
+		};
+
+		bindings.push_back(binding);
+		flags.push_back(array_size > 1 ? VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT : 0);
+
+		return *this;
+	}
+
+	VkDescriptorSetLayout Build(VkDevice device, const std::map<uint32_t, VkDescriptorSetLayout> &global_layouts)
+	{
+		uint32_t set_hash = bindings.size();
+		for (auto &binding: bindings)
+		{
+			set_hash = hash(set_hash, binding.binding);
+			set_hash = hash(set_hash, binding.descriptorType);
+			set_hash = hash(set_hash, binding.descriptorCount);
+			set_hash = hash(set_hash, binding.stageFlags);
+		}
+
+		auto it = global_layouts.find(set_hash);
+		if (it != global_layouts.end())
+		{
+			Info() << "Found layout in cache";
+			return it->second;
+		}
+
+		VkDescriptorSetLayoutBindingFlagsCreateInfo flags_ci
+		{
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+			.pNext = nullptr,
+			.bindingCount = uint32_t(flags.size()),
+			.pBindingFlags = flags.data(),
+		};
+
+		VkDescriptorSetLayoutCreateInfo descriptor_set_layout_ci
+		{
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+			.pNext = &flags_ci,
+			.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
+			.bindingCount = uint32_t(bindings.size()),
+			.pBindings = bindings.data(),
+		};
+
+		VkDescriptorSetLayout descriptor_set_layout = VK_NULL_HANDLE;
+		vkCreateDescriptorSetLayout(device, &descriptor_set_layout_ci, nullptr, &descriptor_set_layout);
+
+		return descriptor_set_layout;
+	}
+
+private:
+	std::vector<VkDescriptorSetLayoutBinding> bindings;
+	std::vector<VkDescriptorBindingFlags> flags;
 };
 
 

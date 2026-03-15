@@ -45,6 +45,8 @@ struct CameraMatrices
 	glm::mat4 view;
 };
 
+
+
 int main()
 {
 	Log::Init(Log::Destination::STDOUT, Log::Level::WARN);
@@ -153,49 +155,71 @@ int main()
 
 	std::vector<GraphicsContext> graphics_context(device->GetFrameCount());
 
-	uint32_t frame_index = 0;
+	std::vector<Texture> gbuffer_textures(3);
+	Texture gbuffer_depth {};
+	FramebufferID gbuffer {};
+
+	Texture final_texture {};
+	Texture final_depth {};
+	FramebufferID final_fbo {};
+
+	gbuffer_textures[0] = device->CreateTexture("Render Target 0", color_desc);
+	gbuffer_textures[1] = device->CreateTexture("Render Target 1", color_desc);
+	gbuffer_textures[2] = device->CreateTexture("Render Target 2", color_desc);
+	gbuffer_depth = device->CreateTexture("Render Target Depth", depth_desc);
+
+	final_texture = device->CreateTexture("Final Render Target", final_texture_desc);
+	final_depth = device->CreateTexture("Final Depth", final_depth_desc);
+
+	FramebufferDesc framebuffer_desc
+	{
+		.width = config.window.width,
+		.height = config.window.height,
+		.samples = color_desc.samples,
+		.color_textures = gbuffer_textures,
+		.depth_texture = gbuffer_depth,
+	};
+
+	gbuffer = device->CreateFramebuffer(framebuffer_desc);
+
+	FramebufferDesc final_fbo_desc
+	{
+		.width = config.window.width,
+		.height = config.window.height,
+		.samples = 1,
+		.color_textures = { final_texture },
+		.depth_texture = gbuffer_depth,
+	};
+
+	final_fbo = device->CreateFramebuffer(final_fbo_desc);
+
+	RenderDeviceVK *vk_device = static_cast<RenderDeviceVK *>(device);
+
+	//uint32_t frame_index = 0;
 	for (auto &context: graphics_context)
 	{
 		context.active_camera_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4) * 2);
-		context.model_matrices_ubo = device->CreateBuffer(GPUBuffer::STORAGE, matrices);
+		context.model_matrices_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, matrices);
+		//context.active_camera_ubo = vk_device->graphics_data.frame_data[frame_index].active_camera_ubo;
+		//context.model_matrices_ubo = vk_device->graphics_data.frame_data[frame_index].model_matrices_ubo;
 		context.colors_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, colors);
 		context.point_lights_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, point_lights);
 		context.camera_light_data = device->CreateBuffer(GPUBuffer::UNIFORM, sizeof(PointLightCameraData) * 1);
 
-		context.gbuffer_textures.resize(3);
+		/*context.gbuffer_textures.resize(3);
 		context.gbuffer_textures[0] = device->CreateTexture(fmt::format("Render Target 0 frame {}", frame_index), color_desc);
 		context.gbuffer_textures[1] = device->CreateTexture(fmt::format("Render Target 1 frame {}", frame_index), color_desc);
 		context.gbuffer_textures[2] = device->CreateTexture(fmt::format("Render Target 2 frame {}", frame_index), color_desc);
-		context.gbuffer_depth = device->CreateTexture(fmt::format("Render Target Depth frame {}", frame_index), depth_desc);
+		context.gbuffer_depth = device->CreateTexture(fmt::format("Render Target Depth frame {}", frame_index), depth_desc);*/
 
-		FramebufferDesc framebuffer_desc
-		{
-			.width = config.window.width,
-			.height = config.window.height,
-			.samples = 1,
-			.color_textures = context.gbuffer_textures,
-			.depth_texture = context.gbuffer_depth,
-		};
-
-		context.gbuffer = device->CreateFramebuffer(framebuffer_desc);
-
-		context.final_texture = device->CreateTexture(fmt::format("Final Render Target frame {}", frame_index), final_texture_desc);
-		//context.final_depth = device->CreateTexture(fmt::format("Final Depth frame {}", frame_index), final_depth_desc);
-
-		FramebufferDesc final_fbo_desc
-		{
-			.width = config.window.width,
-			.height = config.window.height,
-			.samples = 1,
-			.color_textures = { context.final_texture },
-			.depth_texture = context.gbuffer_depth,
-		};
-
-		context.final_fbo = device->CreateFramebuffer(final_fbo_desc);
+		/*context.gbuffer_textures[0] = t0;
+		context.gbuffer_textures[2] = t1;
+		context.gbuffer_textures[1] = t2;
+		context.gbuffer_depth = td;*/
 
 		context.text_vbo = device->CreateBuffer(GPUBuffer::VERTEX, sizeof(float) * 5 * 6 * 100);
 
-		frame_index++;
+		//frame_index++;
 	}
 
 
@@ -264,7 +288,7 @@ int main()
 		flip_scene_set[i] = device->CreateDescriptorSet(pipeline_flip, Descriptor2::Set::SCENE);
 		flip_material_set[i] = device->CreateDescriptorSet(pipeline_flip, Descriptor2::Set::MATERIAL);
 		device->WriteDescriptor(flip_scene_set[i], 0, ortho_ubo);
-		device->WriteDescriptor(flip_material_set[i], 0, graphics_context[i].final_texture);
+		device->WriteDescriptor(flip_material_set[i], 0, final_texture);
 	}
 	/*DescriptorSet flip_scene_set = device->CreateDescriptorSet(pipeline_flip, Descriptor2::Set::SCENE);
 	DescriptorSet flip_material_set = device->CreateDescriptorSet(pipeline_flip, Descriptor2::Set::MATERIAL);
@@ -346,13 +370,13 @@ int main()
 		.camera_pos_ubo = camera_pos_ubo,
 	};*/
 	Deferred deferred(device, &config, &resources);
-	deferred.Create(graphics_context, graphics_context[0].gbuffer);
+	deferred.Create(graphics_context, gbuffer);
 
 	PointLightRenderPath point_light_rp(device, &config, &resources);
-	point_light_rp.Create(graphics_context, /*gbuffer_textures, gbuffer_depth,*/ graphics_context[0].final_fbo);
+	point_light_rp.Create(graphics_context, gbuffer_textures, gbuffer_depth, final_fbo);
 
 	Debug debug(device, &config, &resources);
-	debug.Create(graphics_context, graphics_context[0].final_fbo);
+	debug.Create(graphics_context, final_fbo);
 
 	meshes.push_back(resources.LoadMesh("cubes.bin"));
 
@@ -581,16 +605,16 @@ int main()
 
 		device->SetCullMode(2); // 2
 
-		device->LayoutTransition(context->gbuffer_textures[0], ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
-		device->LayoutTransition(context->gbuffer_textures[1], ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
-		device->LayoutTransition(context->gbuffer_textures[2], ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
-		device->LayoutTransition(context->gbuffer_depth, ImageLayout::UNDEFINED, ImageLayout::DEPTH_STENCIL_ATTACHMENT);
-		device->LayoutTransition(context->final_texture, ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
+		device->LayoutTransition(gbuffer_textures[0], ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
+		device->LayoutTransition(gbuffer_textures[1], ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
+		device->LayoutTransition(gbuffer_textures[2], ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
+		device->LayoutTransition(gbuffer_depth, ImageLayout::UNDEFINED, ImageLayout::DEPTH_STENCIL_ATTACHMENT);
+		device->LayoutTransition(final_texture, ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
 		//device->LayoutTransition(context->final_depth, ImageLayout::UNDEFINED, ImageLayout::DEPTH_STENCIL_ATTACHMENT);
 		//device->LayoutTransition2(context->final_depth, 0);
 		device->LayoutTransition({}, ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
 
-		device->BeginRenderPass(context->gbuffer, RenderPass::Clear::COLOR_DEPTH);
+		device->BeginRenderPass(gbuffer, RenderPass::Clear::COLOR_DEPTH /*, context->final_depth*/);
 		deferred.Render(meshes, device->GetFrameIndex());
 
 		/*device->BindVertexBuffer(editing_vbo);
@@ -599,16 +623,16 @@ int main()
 		device->PushConstant(0, 0);
 		device->Draw(wall_surf.vertex_range.start, wall_surf.vertex_range.count);*/
 
-		device->EndRenderPass(context->gbuffer);
+		device->EndRenderPass(gbuffer);
 
-		device->LayoutTransition(context->gbuffer_textures[0], ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
-		device->LayoutTransition(context->gbuffer_textures[1], ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
-		device->LayoutTransition(context->gbuffer_textures[2], ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
-		device->LayoutTransition(context->gbuffer_depth, ImageLayout::DEPTH_STENCIL_ATTACHMENT, ImageLayout::DEPTH_STENCIL_READ_ONLY);
+		device->LayoutTransition(gbuffer_textures[0], ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
+		device->LayoutTransition(gbuffer_textures[1], ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
+		device->LayoutTransition(gbuffer_textures[2], ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
+		device->LayoutTransition(gbuffer_depth, ImageLayout::DEPTH_STENCIL_ATTACHMENT, ImageLayout::DEPTH_STENCIL_READ_ONLY);
 		//device->LayoutTransition2(context->final_depth, 1);
 		//device->LayoutTransition(context->final_depth, ImageLayout::DEPTH_STENCIL_ATTACHMENT, ImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
-		device->BeginRenderPass(context->final_fbo, RenderPass::Clear::COLOR);
+		device->BeginRenderPass(final_fbo, RenderPass::Clear::COLOR);
 		device->SetCullMode(1);
 		point_light_rp.Render(device->GetFrameIndex());
 		device->SetCullMode(2);
@@ -618,9 +642,9 @@ int main()
 		//device->SetCullMode(2);
 		debug.Render(meshes2, meshes3, device->GetFrameIndex()); // grid, sphere
 		//device->SetCullMode(0);
-		device->EndRenderPass(context->final_fbo);
+		device->EndRenderPass(final_fbo);
 
-		device->LayoutTransition(context->final_texture, ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
+		device->LayoutTransition(final_texture, ImageLayout::COLOR_ATTACHMENT, ImageLayout::COLOR_READ_ONLY);
 
 		device->BeginRenderPass({}, RenderPass::Clear::COLOR);
 		device->BindPipeline(pipeline_flip);

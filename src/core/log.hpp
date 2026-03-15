@@ -79,9 +79,8 @@ protected:
 	static constexpr std::string_view Trim(const char *function_name)
 	{
 		std::string_view name(function_name);
-		size_t start = name.find(' ') + 1;
-		size_t end = name.find('(');
-		return name.substr(start, end - start);
+		name = name.substr(0, name.find('('));
+		return name.substr(name.find_last_of(' ') + 1);
 	}
 
 private:

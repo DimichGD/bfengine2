@@ -8,11 +8,11 @@ GLenum ConvertEnum(GPUBuffer::Type value)
 {
 	switch (value)
 	{
-		case GPUBuffer::Type::VERTEX: return GL_ARRAY_BUFFER;
-		case GPUBuffer::Type::INDEX: return GL_ELEMENT_ARRAY_BUFFER;
-		case GPUBuffer::Type::UNIFORM: return GL_UNIFORM_BUFFER;
-		case GPUBuffer::Type::STORAGE: return GL_SHADER_STORAGE_BUFFER;
-		case GPUBuffer::Type::STAGING: return {}; // TODO: report error?
+		case GPUBuffer::Type::VERTEX:   return GL_ARRAY_BUFFER;
+		case GPUBuffer::Type::INDEX:    return GL_ELEMENT_ARRAY_BUFFER;
+		case GPUBuffer::Type::UNIFORM:  return GL_UNIFORM_BUFFER;
+		case GPUBuffer::Type::STORAGE:  return GL_SHADER_STORAGE_BUFFER;
+		case GPUBuffer::Type::INDIRECT: return GL_DRAW_INDIRECT_BUFFER;
 	}
 
 	return {};
@@ -22,10 +22,10 @@ GLenum ConvertEnum(Shader::Type value)
 {
 	switch (value)
 	{
-		case Shader::Type::VERTEX: return GL_VERTEX_SHADER;
+		case Shader::Type::VERTEX:   return GL_VERTEX_SHADER;
 		case Shader::Type::FRAGMENT: return GL_FRAGMENT_SHADER;
 		case Shader::Type::GEOMETRY: return GL_GEOMETRY_SHADER;
-		case Shader::Type::COMPUTE: return GL_COMPUTE_SHADER;
+		case Shader::Type::COMPUTE:  return GL_COMPUTE_SHADER;
 	}
 
 	return {};

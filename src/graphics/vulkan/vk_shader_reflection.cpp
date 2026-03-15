@@ -24,7 +24,7 @@ static std::map<VkShaderStageFlagBits, std::string> stage_name
 	{ VK_SHADER_STAGE_FRAGMENT_BIT, "FRAGMENT" },
 };
 
-ShaderReflectionData GetShaderReflection(const std::string &name, Shader::Type type, const uint32_t *spirv, size_t word_count)
+/*ShaderReflectionData GetShaderReflection(const std::string &name, Shader::Type type, const uint32_t *spirv, size_t word_count)
 {
 	std::vector<Constant> constants;
 	std::array<std::vector<Descriptor2>, 4> sets;
@@ -100,27 +100,27 @@ ShaderReflectionData GetShaderReflection(const std::string &name, Shader::Type t
 			constants.emplace_back(range.offset, range.range, type);
 		}
 
-		/*spirv_cross::SPIRType type = compiler.get_type(resource.base_type_id);
-		//Log() << "Push constant buffer" << compiler.get_declared_struct_size(compiler.get_type(resource.base_type_id));
+		// spirv_cross::SPIRType type = compiler.get_type(resource.base_type_id);
+		// //Log() << "Push constant buffer" << compiler.get_declared_struct_size(compiler.get_type(resource.base_type_id));
 
-		//constants.emplace_back(0, compiler.get_declared_struct_size(type), Constant::Type::INT);
-		//continue;
+		// //constants.emplace_back(0, compiler.get_declared_struct_size(type), Constant::Type::INT);
+		// //continue;
 
-		for (uint32_t i = 0; i < type.member_types.size(); ++i)
-		{
-			//const spirv_cross::SPIRType &member_type = compiler.get_type(type.member_types[i]);
-			uint32_t offset = compiler.get_member_decoration(type.self, i, spirv_cross::DecorationOffset);
-			Constant::Type type = Constant::Type::INT;
-			constants.emplace_back(offset, sizeof(int), type);
+		// for (uint32_t i = 0; i < type.member_types.size(); ++i)
+		// {
+		// 	//const spirv_cross::SPIRType &member_type = compiler.get_type(type.member_types[i]);
+		// 	uint32_t offset = compiler.get_member_decoration(type.self, i, spirv_cross::DecorationOffset);
+		// 	Constant::Type type = Constant::Type::INT;
+		// 	constants.emplace_back(offset, sizeof(int), type);
 
-			//Log() << compiler.get_member_name(type.self, i)
-			//	  << compiler.get_member_decoration(type.self, i, spirv_cross::DecorationOffset)
-			//	  << member_type.basetype << member_type.vecsize;
-		}*/
+		// 	//Log() << compiler.get_member_name(type.self, i)
+		// 	//	  << compiler.get_member_decoration(type.self, i, spirv_cross::DecorationOffset)
+		// 	//	  << member_type.basetype << member_type.vecsize;
+		// }
 	}
 
 	return { name, max_set, type, std::move(constants), std::move(sets) };
-}
+}*/
 
 std::vector<uint32_t> CompileShader(const std::string &name, const std::vector<char> &source)
 {
@@ -191,35 +191,35 @@ std::vector<uint32_t> CompileShader(const std::string &name, Shader::Type type, 
 	return binary;
 }
 
-VkPipelineLayout CreatePipelineLayout(VkDevice device,
+/*VkPipelineLayout CreatePipelineLayout(VkDevice device,
 									  std::map<uint32_t, VkDescriptorSetLayout> &global_descriptor_set_layouts,
 									  const std::vector<ShaderReflectionData *> &reflection_data,
 									  std::array<ConstantRange, 4> &constant_ranges,
 									  std::vector<VkDescriptorSetLayout> &decriptor_set_layouts,
 									  VkPipelineLayoutCreateFlags flags)
 {
-	/*std::vector<VkPushConstantRange> push_constant_ranges;
+	// std::vector<VkPushConstantRange> push_constant_ranges;
 
-	// TODO: overlapping ranges
-	for (const ShaderReflectionData *data: reflection_data)
-	{
-		for (auto &desc: data->constants)
-		{
-			VkPushConstantRange push_constant_range
-			{
-				.stageFlags = vk::ConvertEnum(data->stage),
-				.offset = desc.offset,
-				.size = desc.size, //const_sizes_map[desc.type],
-			};
+	// // TODO: overlapping ranges
+	// for (const ShaderReflectionData *data: reflection_data)
+	// {
+	// 	for (auto &desc: data->constants)
+	// 	{
+	// 		VkPushConstantRange push_constant_range
+	// 		{
+	// 			.stageFlags = vk::ConvertEnum(data->stage),
+	// 			.offset = desc.offset,
+	// 			.size = desc.size, //const_sizes_map[desc.type],
+	// 		};
 
-			push_constant_ranges.push_back(push_constant_range);
-		}
-	}*/
+	// 		push_constant_ranges.push_back(push_constant_range);
+	// 	}
+	// }
 
 	//
-	/*Log() << "--------------------------";
-	for (const ShaderReflectionData *data: reflection_data)
-		Log() << data->name;*/
+	// Log() << "--------------------------";
+	// for (const ShaderReflectionData *data: reflection_data)
+	// 	Log() << data->name;
 
 	// merge reflection data
 
@@ -229,11 +229,11 @@ VkPipelineLayout CreatePipelineLayout(VkDevice device,
 		VkShaderStageFlags stage_flags = 0;
 	};
 
-	/*struct StageConstant
-	{
-		Constant constant;
-		VkShaderStageFlags stage_flags = 0;
-	};*/
+	// struct StageConstant
+	// {
+	// 	Constant constant;
+	// 	VkShaderStageFlags stage_flags = 0;
+	// };
 
 	std::array<std::vector<StageDescriptor>, 4> combined_descriptors;
 	std::vector<ConstantRange> combined_constants;
@@ -391,20 +391,11 @@ VkPipelineLayout CreatePipelineLayout(VkDevice device,
 	vkCreatePipelineLayout(device, &pipeline_layout_ci, nullptr, &layout);
 
 	return layout;
-}
+}*/
 
-void CreatePipelineLayout(VkDevice device, Pipeline &pipeline,
-						  std::map<uint32_t, VkDescriptorSetLayout> &global_descriptor_set_layouts,
-						  const std::vector<ShaderDesc> &reflection_data)
+std::array<std::vector<StageDescriptor>, 4> CombineDescriptors(const std::vector<ShaderDesc> &reflection_data)
 {
-	struct StageDescriptor
-	{
-		Descriptor2 descriptor;
-		VkShaderStageFlags stage_flags = 0;
-	};
-
 	std::array<std::vector<StageDescriptor>, 4> combined_descriptors;
-	std::vector<ConstantRange> combined_constants;
 
 	uint32_t texture_index = 0;
 	for (auto &data: reflection_data)
@@ -416,6 +407,83 @@ void CreatePipelineLayout(VkDevice device, Pipeline &pipeline,
 			Descriptor2::Type type = Descriptor2::Type::UNIFORM_BUFFER;
 			if (buffer == EngineDescriptor::MODEL_MATRICES)
 				type = Descriptor2::Type::STORAGE_BUFFER;
+
+			Descriptor2 desc(set_index, binding_index, type, 1);
+			if (buffer == EngineDescriptor::TEXTURES)
+			{
+				desc.type = Descriptor2::Type::TEXTURE;
+				desc.array_size = 32;
+			}
+
+			auto it = std::find_if(combined_descriptors[set_index].begin(), combined_descriptors[set_index].end(),
+								   [&desc](const StageDescriptor &other){ return other.descriptor == desc; });
+
+			if (it != combined_descriptors[set_index].end())
+				it->stage_flags |= vk::ConvertEnum(data.type);
+
+			else
+				combined_descriptors[set_index].push_back({ desc, vk::ConvertEnum(data.type) });
+		}
+
+		for (auto &texture: data.textures)
+		{
+			uint32_t set_index = 1;
+			uint32_t binding_index = texture_index++;
+
+			Descriptor2 desc(set_index, binding_index, Descriptor2::Type::TEXTURE, 1);
+			auto it = std::find_if(combined_descriptors[set_index].begin(), combined_descriptors[set_index].end(),
+								   [&desc](const StageDescriptor &other){ return other.descriptor == desc; });
+
+			if (it != combined_descriptors[set_index].end())
+				it->stage_flags |= vk::ConvertEnum(data.type);
+
+			else
+				combined_descriptors[set_index].push_back({ desc, vk::ConvertEnum(data.type) });
+		}
+
+		/*for (auto &constant: data.constants)
+		{
+			ConstantRange range;
+			switch (constant)
+			{
+				case EngineConstants::OBJECT_INDEX: range = { vk::ConvertEnum(data.type), 0, 4 }; break;
+				case EngineConstants::MATERIAL_INDEX: range = { vk::ConvertEnum(data.type), 4, 4 }; break;
+				case EngineConstants::FACTOR: range = { vk::ConvertEnum(data.type), 8, 4 }; break;
+				case EngineConstants::TIME: range = { vk::ConvertEnum(data.type), 12, 4 }; break;
+			}
+
+			auto it = std::find_if(combined_constants.begin(), combined_constants.end(),
+				[&range](const ConstantRange &other)
+					{ return other.offset == range.offset && other.size == range.size; });
+
+			if (it != combined_constants.end())
+				it->stage_flags |= vk::ConvertEnum(data.type);
+
+			else
+				combined_constants.push_back(range);
+		}*/
+	}
+
+	return combined_descriptors;
+}
+
+void CreatePipelineLayout(VkDevice device, Pipeline &pipeline,
+						  std::map<uint32_t, VkDescriptorSetLayout> &global_descriptor_set_layouts,
+						  const std::vector<ShaderDesc> &reflection_data)
+{
+	std::array<std::vector<StageDescriptor>, 4> combined_descriptors;
+	std::vector<ConstantRange> combined_constants;
+
+	uint32_t texture_index = 0;
+	for (auto &data: reflection_data)
+	{
+		for (auto &buffer: data.buffers)
+		{
+			uint32_t set_index = GetDescriptorSet(buffer);
+			uint32_t binding_index = GetDescriptorBinding(buffer);
+			Descriptor2::Type type = Descriptor2::Type::UNIFORM_BUFFER;
+			//if (buffer == EngineDescriptor::MODEL_MATRICES)
+			//	type = Descriptor2::Type::STORAGE_BUFFER;
 
 			Descriptor2 desc(set_index, binding_index, type, 1);
 			if (buffer == EngineDescriptor::TEXTURES)
@@ -495,8 +563,12 @@ void CreatePipelineLayout(VkDevice device, Pipeline &pipeline,
 			};
 
 			bindings.push_back(binding);
-			set_hash = hash(set_hash, desc.descriptor.Hash());
-			set_hash = hash(set_hash, desc.stage_flags);
+			//set_hash = hash(set_hash, desc.descriptor.Hash());
+			//set_hash = hash(set_hash, desc.stage_flags);
+			set_hash = hash(set_hash, binding.binding);
+			set_hash = hash(set_hash, binding.descriptorType);
+			set_hash = hash(set_hash, binding.descriptorCount);
+			set_hash = hash(set_hash, binding.stageFlags);
 			//Log() << uint32_t(desc.descriptor.set) << uint32_t(desc.descriptor.binding)
 			//	  << type_name[desc.descriptor.type] << desc.stage_flags;
 		}
@@ -504,13 +576,13 @@ void CreatePipelineLayout(VkDevice device, Pipeline &pipeline,
 		if (set_hash == 0)
 			throw std::runtime_error("Descriptor set hash cannot be zero");
 
-		/*auto it = global_descriptor_set_layouts.find(set_hash);
+		auto it = global_descriptor_set_layouts.find(set_hash);
 		if (it != global_descriptor_set_layouts.end())
 		{
 			//Log() << it->first << "Found in global_descriptor_set_layouts";
 			pipeline.decriptor_set_layouts.push_back(it->second);
 			continue;
-		}*/
+		}
 
 		//if (!set.empty())
 		//	Log() << "hash" << set_hash;
@@ -580,6 +652,8 @@ void CreatePipelineLayout(VkDevice device, Pipeline &pipeline,
 
 	vkCreatePipelineLayout(device, &pipeline_layout_ci, nullptr, &pipeline.layout);
 }
+
+
 
 
 

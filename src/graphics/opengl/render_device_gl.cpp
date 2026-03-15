@@ -98,7 +98,7 @@ void RenderDeviceGL::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 
 	if (framebuffer_id)
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_id.handle);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_id.index);
 	}
 	else
 	{
@@ -140,9 +140,9 @@ PipelineID RenderDeviceGL::CreatePipeline(const std::string &name, const Pipelin
 
 void RenderDeviceGL::BindPipeline(PipelineID pipeline_id)
 {
-	current_pipeline = pipelines[pipeline_id.handle];
-	glUseProgram(current_pipeline.prog.handle);
-	glBindVertexArray(current_pipeline.vao.handle);
+	current_pipeline = pipelines[pipeline_id.index];
+	glUseProgram(current_pipeline.prog.index);
+	glBindVertexArray(current_pipeline.vao.index);
 	//glVertexArrayElementBuffer(pipeline.vao.handle, 0);
 
 	current_pipeline.raster.depth_test ? glEnable(GL_DEPTH_TEST) : glDisable(GL_DEPTH_TEST);
@@ -180,14 +180,14 @@ void RenderDeviceGL::BindPipeline(PipelineID pipeline_id)
 void RenderDeviceGL::BindVertexBuffer(GPUBuffer buffer)
 {
 	assert(buffer.type == GPUBuffer::Type::VERTEX);
-	glBindVertexBuffer(0, buffer.handle, 0, current_pipeline.vao.stride);
+	glBindVertexBuffer(0, buffer.index, 0, current_pipeline.vao.stride);
 }
 
 void RenderDeviceGL::BindIndexBuffer(GPUBuffer buffer)
 {
 	assert(buffer.type == GPUBuffer::Type::INDEX);
 	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer.handle);
-	glVertexArrayElementBuffer(current_pipeline.vao.handle, buffer.handle);
+	glVertexArrayElementBuffer(current_pipeline.vao.index, buffer.index);
 }
 
 void RenderDeviceGL::SetCullMode(uint32_t mode)
@@ -218,17 +218,17 @@ DescriptorSet RenderDeviceGL::CreateDescriptorSet(PipelineID pipeline, Descripto
 
 void RenderDeviceGL::WriteDescriptor(DescriptorSet set, uint32_t binding, GPUBuffer value)
 {
-	descriptors2.at(set.handle)[binding] = { -1, value };
+	descriptors2.at(set.index)[binding] = { -1, value };
 }
 
 void RenderDeviceGL::WriteDescriptor(DescriptorSet set, uint32_t binding, Texture value, uint32_t index)
 {
-	descriptors2.at(set.handle)[binding] = { -1, value };
+	descriptors2.at(set.index)[binding] = { -1, value };
 }
 
 void RenderDeviceGL::BindDescriptorSet(Descriptor2::Set index, DescriptorSet descriptor_set)
 {
-	auto &set = descriptors2.at(descriptor_set.handle);
+	auto &set = descriptors2.at(descriptor_set.index);
 	for (auto &desc_struct: set)
 	{
 		uint32_t binding = desc_struct.first;
@@ -238,14 +238,14 @@ void RenderDeviceGL::BindDescriptorSet(Descriptor2::Set index, DescriptorSet des
 			case 0:
 			{
 				Texture texture = std::get<Texture>(desc.value);
-				glBindTextureUnit(binding, texture.handle);
+				glBindTextureUnit(binding, texture.index);
 				break;
 			}
 
 			case 1:
 			{
 				GPUBuffer buffer = std::get<GPUBuffer>(desc.value);
-				glBindBufferBase(gl::ConvertEnum(buffer.type), binding, buffer.handle);
+				glBindBufferBase(gl::ConvertEnum(buffer.type), binding, buffer.index);
 				break;
 			}
 		}
@@ -281,12 +281,12 @@ FramebufferID RenderDeviceGL::CreateFramebuffer(const FramebufferDesc &desc)
 
 	for (size_t i = 0; i < desc.color_textures.size(); i++)
 	{
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, desc.color_textures[i].handle, 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, desc.color_textures[i].index, 0);
 		draw_buffers[i] = GL_COLOR_ATTACHMENT0 + i;
 	}
 
 	if (desc.depth_texture)
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, desc.depth_texture.handle, 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, desc.depth_texture.index, 0);
 
 	glDrawBuffers(draw_buffers.size(), draw_buffers.data());
 
@@ -402,17 +402,17 @@ void RenderDeviceGL::UpdateBuffer(GPUBuffer buffer, uint32_t size, const void *d
 		return;
 	}
 
-	glNamedBufferSubData(buffer.handle, offset, size, data);
+	glNamedBufferSubData(buffer.index, offset, size, data);
 }
 
 void *RenderDeviceGL::MapBuffer(GPUBuffer buffer)
 {
-	return glMapNamedBuffer(buffer.handle, GL_WRITE_ONLY);
+	return glMapNamedBuffer(buffer.index, GL_WRITE_ONLY);
 }
 
 void RenderDeviceGL::UnMapBuffer(GPUBuffer buffer)
 {
-	glUnmapNamedBuffer(buffer.handle);
+	glUnmapNamedBuffer(buffer.index);
 }
 
 Texture RenderDeviceGL::CreateTexture(const std::string &name, const TextureDesc &desc)
@@ -483,12 +483,12 @@ Program RenderDeviceGL::CreateProgram(const std::vector<Shader> &shaders)
 	//glAttachShader(prog, shaders.handle);
 	//glAttachShader(prog, fs.handle);
 	for (auto &shader: shaders)
-		glAttachShader(prog, shader.handle);
+		glAttachShader(prog, shader.index);
 
 	glLinkProgram(prog);
 
 	for (auto &shader: shaders)
-		glDetachShader(prog, shader.handle);
+		glDetachShader(prog, shader.index);
 
 	//glDetachShader(prog, shaders.handle);
 	//glDetachShader(prog, fs.handle);

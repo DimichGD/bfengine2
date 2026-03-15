@@ -46,7 +46,7 @@ public:
 
 	//uint32_t current_index = 0;
 	DescriptorSet scene_set[3] {};
-	DescriptorSet material_set {};
+	//DescriptorSet material_set {};
 	//uint32_t material_set = 0;
 	//std::vector<Texture> render_targets;
 	//Texture depth_texture;

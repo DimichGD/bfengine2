@@ -13,6 +13,8 @@ ResourceManager::ResourceManager(RenderDevice *device, FileSystem *fs)
 	this->device = device;
 	this->fs = fs;
 
+	static_cast<RenderDeviceVK *>(device)->RegisterMaterial(CustomMaterial::Type(), CustomMaterial::Descriptors());
+
 	File def_file(fs->GetDataPath() + "shaders/shaders.def");
 	def_file.Open();
 
@@ -26,7 +28,7 @@ ResourceManager::ResourceManager(RenderDevice *device, FileSystem *fs)
 	buffer = mat_file.Read();
 	Parser parser2(buffer);
 	//material_defs.merge(parser2.DoStuff2());
-	uint32_t mat_index = 0;
+	//uint32_t mat_index = 0;
 	for (auto mat: parser2.DoStuff2())
 	{
 		std::vector<Texture> textures;
@@ -34,9 +36,13 @@ ResourceManager::ResourceManager(RenderDevice *device, FileSystem *fs)
 		for (auto tex: mat.second)
 			textures.push_back(LoadTexture(tex.first, tex.second));
 
-		materials[mat.first] = std::make_shared<CustomMaterial>(mat.first, std::move(textures), mat_index);
+		auto material = std::make_shared<CustomMaterial>(mat.first, textures, 0);
+		material->set = static_cast<RenderDeviceVK *>(device)->CreateMaterialDescriptorSet(CustomMaterial::Type());
+		material->Setup2(device, nullptr, Descriptor2::Set::MATERIAL, material->set);
+		materials[mat.first] = material;
+		//materials[mat.first] = std::make_shared<CustomMaterial>(mat.first, textures, mat_index);
 
-		mat_index += 3;
+		//mat_index += 3;
 	}
 
 	std::string material_name = "red.png";
@@ -310,7 +316,7 @@ Mesh ResourceManager::LoadMesh(std::string_view filename)
 			PhongMaterial *mat = new PhongMaterial(tex_d, tex_n, tex_s);*/
 			//Log() << material_name;
 			auto material = std::static_pointer_cast<CustomMaterial>(LoadMaterial(material_name));
-			surfaces[i] = { { vertex_start, vertex_count }, material, material->index, {} };
+			surfaces[i] = { { vertex_start, vertex_count }, material, material->index, material->set };
 		}
 	}
 

@@ -138,6 +138,8 @@ bool IsPushConstant(EngineUniform uniform)
 
 std::string GetShaderString(const ShaderDesc &desc)
 {
+	return "";
+
 	std::stringstream ss;
 
 	ss << "#version 460\n\n";

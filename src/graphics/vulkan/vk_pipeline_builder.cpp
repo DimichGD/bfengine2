@@ -83,7 +83,7 @@ void GraphicsPipelineBuilder::SetSwapchainFormat(VkFormat color_format, VkFormat
 void GraphicsPipelineBuilder::SetFramebuffer(const Framebuffer &framebuffer)
 {
 	if (!framebuffer.color_textures.empty() && framebuffer.samples > 1)
-		samples = VK_SAMPLE_COUNT_4_BIT;
+		samples = VkSampleCountFlagBits(framebuffer.samples);
 
 	attachment_formats.reserve(framebuffer.color_textures.size());
 	for (auto texture: framebuffer.color_textures)
@@ -166,7 +166,7 @@ VkPipeline GraphicsPipelineBuilder::Build(VkDevice device, VkPipelineCache pipel
 		.pNext = nullptr,
 		.flags = 0,
 		.rasterizationSamples = samples,
-		.sampleShadingEnable = VK_FALSE,
+		.sampleShadingEnable = int(samples) > 1 ? VK_TRUE : VK_FALSE,
 		.minSampleShading = 1.0f,
 		.pSampleMask = &sample_mask, // TODO: is it correct?
 		.alphaToCoverageEnable = VK_FALSE,

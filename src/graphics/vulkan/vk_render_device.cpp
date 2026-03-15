@@ -13,6 +13,7 @@
 #include <glm/gtc/type_ptr.hpp>
 //#include <spirv_cross/spirv_cross_c.h>
 #include <processthreadsapi.h>
+#include <ranges>
 #include <shaderc/shaderc.h>
 #include <cassert>
 #include <map>
@@ -41,13 +42,14 @@ struct RenderDeviceVK::Storage
 	std::vector<VkDescriptorPool> descriptor_pools;
 	std::vector<VkDescriptorSet> descriptor_sets;
 	std::map<uint32_t, VkDescriptorSetLayout> descriptor_set_layouts;
+	std::map<uint32_t, VkDescriptorSetLayout> material_set_layouts;
 
 	std::vector<vk::Buffer> buffers;
 	std::vector<vk::Texture> textures;
 	std::vector<Framebuffer> framebuffers;
 
 	//std::map<uint32_t, std::vector<Descriptor2>> shader_reflection;
-	std::map<uint32_t, ShaderReflectionData> shader_reflection;
+	//std::map<uint32_t, ShaderReflectionData> shader_reflection;
 };
 
 
@@ -97,7 +99,7 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 	//Log() << props.limits.minUniformBufferOffsetAlignment;
 
 
-	vk->frame_resources.resize(2);
+	vk->frame_resources.resize(frames_in_flight);
 
 	VkSemaphoreTypeCreateInfoKHR semaphore_type_ci
 	{
@@ -244,9 +246,9 @@ bool RenderDeviceVK::Create(SDL_Window *window_handle)
 	vkCreateDescriptorPool(vk->device, &descritor_pool_ci, nullptr, &store->descriptor_pool);
 
 
-	GPUBuffer staging = CreateBuffer(GPUBuffer::STAGING, 16 * 1024 * 1024);
-	vk->staging_buffer = store->buffers[staging.handle].buffer;
-	vk->staging_memory = store->buffers[staging.handle].memory;
+	/*GPUBuffer staging = CreateBuffer(GPUBuffer::STAGING, 16 * 1024 * 1024);
+	vk->staging_buffer = store->buffers[staging.index].buffer;
+	vk->staging_memory = store->buffers[staging.index].memory;*/
 
 	VkSamplerCreateInfo sampler_ci
 	{
@@ -434,7 +436,7 @@ Shader RenderDeviceVK::LoadShader(Shader::Type type, const std::string &name)
 		}
 	}
 
-	ShaderReflectionData reflection_data = vk::GetShaderReflection(name, type, binary.data(), binary.size());
+	//ShaderReflectionData reflection_data = vk::GetShaderReflection(name, type, binary.data(), binary.size());
 
 	VkShaderModuleCreateInfo shader_ci
 	{
@@ -456,7 +458,7 @@ Shader RenderDeviceVK::LoadShader(Shader::Type type, const std::string &name)
 	vk->SetObjectName(VK_OBJECT_TYPE_SHADER_MODULE, module, name.c_str());
 
 	store->shader_modules.push_back(module);
-	store->shader_reflection[store->shader_modules.size() - 1] = std::move(reflection_data);
+	//store->shader_reflection[store->shader_modules.size() - 1] = std::move(reflection_data);
 	return Shader(store->shader_modules.size() - 1, type);
 }
 
@@ -484,7 +486,7 @@ Shader RenderDeviceVK::LoadShader(const std::string &name, const ShaderDesc &des
 
 	binary_file.Write(binary.data(), binary.size() * sizeof(uint32_t));
 
-	ShaderReflectionData reflection_data = vk::GetShaderReflection(desc.filename, desc.type, binary.data(), binary.size());
+	//ShaderReflectionData reflection_data = vk::GetShaderReflection(desc.filename, desc.type, binary.data(), binary.size());
 
 	VkShaderModuleCreateInfo shader_ci
 	{
@@ -508,13 +510,13 @@ Shader RenderDeviceVK::LoadShader(const std::string &name, const ShaderDesc &des
 	shader_desc_map[store->shader_modules.size()] = desc;
 
 	store->shader_modules.push_back(module);
-	store->shader_reflection[store->shader_modules.size() - 1] = std::move(reflection_data);
+	//store->shader_reflection[store->shader_modules.size() - 1] = std::move(reflection_data);
 	return Shader(store->shader_modules.size() - 1, desc.type);
 }
 
 Shader RenderDeviceVK::LoadShader(const std::string &name, ShaderDesc &desc, const std::vector<uint32_t> &binary)
 {
-	ShaderReflectionData reflection_data = vk::GetShaderReflection(name, desc.type, binary.data(), binary.size());
+	//ShaderReflectionData reflection_data = vk::GetShaderReflection(name, desc.type, binary.data(), binary.size());
 
 	VkShaderModuleCreateInfo shader_ci
 	{
@@ -538,7 +540,7 @@ Shader RenderDeviceVK::LoadShader(const std::string &name, ShaderDesc &desc, con
 	shader_desc_map[store->shader_modules.size()] = desc;
 
 	store->shader_modules.push_back(module);
-	store->shader_reflection[store->shader_modules.size() - 1] = std::move(reflection_data);
+	//store->shader_reflection[store->shader_modules.size() - 1] = std::move(reflection_data);
 	return Shader(store->shader_modules.size() - 1, desc.type);
 }
 
@@ -557,16 +559,53 @@ PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const Pipelin
 		pipeline.constant_ranges, pipeline.decriptor_set_layouts, 0);*/
 
 	vk::CreatePipelineLayout(vk->device, pipeline, store->descriptor_set_layouts,
-							 { shader_desc_map[desc.shaders[0].handle], shader_desc_map[desc.shaders[1].handle] });
+							 { shader_desc_map[desc.shaders[0].index], shader_desc_map[desc.shaders[1].index] });
 
 	//if (name == "deferred/static_meshes")
-	//	std::terminate();
+	//	Log();
 
 	for (size_t i = 0; i < pipeline.decriptor_set_layouts.size(); i++)
 	{
 		vk->SetObjectName(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, pipeline.decriptor_set_layouts[i],
 						  fmt::format("{} {}", name, i).c_str());
 	}
+
+	auto combined_descriptors = vk::CombineDescriptors({ shader_desc_map[desc.shaders[0].index],
+														 shader_desc_map[desc.shaders[1].index] });
+
+
+
+	/*if (name == "deferred/static_meshes")
+	{
+		std::vector<VkDescriptorSetLayout> layouts(frames_in_flight, pipeline.decriptor_set_layouts[0]);
+		std::vector<VkDescriptorSet> descriptor_sets(frames_in_flight);
+
+		VkDescriptorSetAllocateInfo alloc_info
+		{
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			.pNext = nullptr,
+			.descriptorPool = store->descriptor_pool,
+			.descriptorSetCount = frames_in_flight,
+			.pSetLayouts = layouts.data(),
+		};
+
+		vkAllocateDescriptorSets(vk->device, &alloc_info, descriptor_sets.data());
+
+		//vk->SetObjectName(VK_OBJECT_TYPE_DESCRIPTOR_SET, descriptor_set,
+		//				  fmt::format("double fucking set {}", store->descriptor_sets.size()).c_str());
+
+		uint32_t prev_size = store->descriptor_sets.size();
+		for (const auto &[set, data]: std::views::zip(descriptor_sets, graphics_data.frame_data))
+		{
+			store->descriptor_sets.push_back(set);
+			DescriptorSet set2 = { uint32_t(store->descriptor_sets.size() - 1) };
+
+			WriteDescriptor(set2, 0, data.active_camera_ubo);
+			WriteDescriptor(set2, 1, data.model_matrices_ubo);
+		}
+
+		pipeline.descriptors.push_back({ prev_size });
+	}*/
 
 	vk::GraphicsPipelineBuilder builder(vk->device);
 	builder.SetTopology(desc.topology);
@@ -581,7 +620,7 @@ PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const Pipelin
 		builder.SetSwapchainFormat(vk->swapchain_format);
 
 	for (const Shader &shader: desc.shaders)
-		builder.AppendShader(vk::ConvertEnum(shader.type), store->shader_modules[shader.handle]);
+		builder.AppendShader(vk::ConvertEnum(shader.type), store->shader_modules[shader.index]);
 
 	pipeline.pipeline = builder.Build(vk->device, VK_NULL_HANDLE); // TODO: measure pipeline cache speedup if any
 	if (pipeline.pipeline == VK_NULL_HANDLE)
@@ -596,9 +635,22 @@ PipelineID RenderDeviceVK::CreatePipeline(const std::string &name, const Pipelin
 
 void RenderDeviceVK::BindPipeline(PipelineID pipeline)
 {
-	store->current_pipeline = store->pipelines.at(pipeline.handle);
+	store->current_pipeline = store->pipelines.at(pipeline.index);
 	vkCmdBindPipeline(vk->current_command_buffer,
 					  VK_PIPELINE_BIND_POINT_GRAPHICS, store->current_pipeline.pipeline);
+
+	/*uint32_t index = 0;
+	for (auto set: store->current_pipeline.descriptors)
+	{
+		BindDescriptorSet(Descriptor2::Set(index), DescriptorSet(set.index + GetFrameIndex()));
+		index += 1;
+	}*/
+
+	if (!store->current_pipeline.descriptors.empty())
+		BindDescriptorSet(Descriptor2::Set::SCENE, DescriptorSet(store->current_pipeline.descriptors[0].index + GetFrameIndex()));
+
+	if (store->current_pipeline.descriptors.size() > 1)
+		std::terminate();
 }
 
 void RenderDeviceVK::Draw(uint32_t first, uint32_t count)
@@ -637,13 +689,18 @@ void RenderDeviceVK::BeginFrame()
 
 	//Log() << vk->present_id;
 
-	if (vk->present_id > vk->swapchain_resources.size())
-		vk->WaitForPresentKHR(vk->device, vk->swapchain, vk->present_id - 1, UINT64_MAX);
+	/*if (vk->present_id > vk->frame_resources.size())
+	{
+		VkResult result = vk->WaitForPresentKHR(vk->device, vk->swapchain, vk->present_id - vk->frame_resources.size(),
+												UINT64_MAX); // TODO: make something more meaningful like 10 seconds
+		(void)result;
+	}*/
 
 
+	//vkQueueWaitIdle(vk->graphics_queue);
 	vkWaitForFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence, VK_TRUE, UINT64_MAX);
 	vkResetFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence);
-	//vkQueueWaitIdle(vk->graphics_queue);
+
 	//times[1] = SDL_GetTicks();
 
 	VkResult result = vkAcquireNextImageKHR(vk->device, vk->swapchain, UINT64_MAX,
@@ -715,9 +772,9 @@ void RenderDeviceVK::EndFrame()
 	times[3] = SDL_GetTicks();
 	//vkResetFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence);
 	times[4] = SDL_GetTicks();
-	//vkQueueSubmit(vk->graphics_queue, 1, &submit_info, vk->frame_resources[vk->frame_index].fence);
+	vkQueueSubmit(vk->graphics_queue, 1, &submit_info, vk->frame_resources[vk->frame_index].fence);
 
-	VkSemaphoreSubmitInfo wait_semaphore_submit_info
+	/*VkSemaphoreSubmitInfo wait_semaphore_submit_info
 	{
 		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
 		.pNext = nullptr,
@@ -772,7 +829,7 @@ void RenderDeviceVK::EndFrame()
 
 	//vkResetFences(vk->device, 1, &vk->frame_resources[vk->frame_index].fence);
 
-	vkQueueSubmit2(vk->graphics_queue, 1, &submit_info_2, vk->frame_resources[vk->frame_index].fence); //vk->frame_resources[vk->frame_index].fence);
+	vkQueueSubmit2(vk->graphics_queue, 1, &submit_info_2, vk->frame_resources[vk->frame_index].fence);*/ //vk->frame_resources[vk->frame_index].fence);
 
 	/*uint64_t wait_value = vk->frame_timeline_index + 1;
 	VkSemaphoreWaitInfo wait_semaphore_present_info
@@ -871,11 +928,11 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 
 	if (framebuffer_id)
 	{
-		Framebuffer framebuffer = store->framebuffers[framebuffer_id.handle];
+		Framebuffer framebuffer = store->framebuffers[framebuffer_id.index];
 		for (auto &texture: framebuffer.color_textures)
-			color_image_views.push_back(store->textures[texture.handle].image_view);
-		depth_image_view = store->textures[framebuffer.depth_texture.handle].image_view;
-		depth_layout = store->textures[framebuffer.depth_texture.handle].layout;
+			color_image_views.push_back(store->textures[texture.index].image_view);
+		depth_image_view = store->textures[framebuffer.depth_texture.index].image_view;
+		depth_layout = store->textures[framebuffer.depth_texture.index].layout;
 		width = framebuffer.width;
 		height = framebuffer.height;
 	}
@@ -931,7 +988,7 @@ void RenderDeviceVK::BeginRenderPass(FramebufferID framebuffer_id, RenderPass::C
 	if (resolve_depth)
 	{
 		depth_attachment.resolveMode = VK_RESOLVE_MODE_MIN_BIT;
-		depth_attachment.resolveImageView = store->textures[resolve_depth.handle].image_view;
+		depth_attachment.resolveImageView = store->textures[resolve_depth.index].image_view;
 		depth_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
 	}
 
@@ -1021,7 +1078,7 @@ void RenderDeviceVK::LayoutTransition(Texture texture, ImageLayout from, ImageLa
 		//if (texture.prev_layout == to) // FIXME: does queue transfer has same layout? need to check
 		//	return;
 
-		vk_texture = &store->textures[texture.handle];
+		vk_texture = &store->textures[texture.index];
 
 		if (Texture::IsDepth(texture.format))
 			subresource_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
@@ -1142,23 +1199,51 @@ void RenderDeviceVK::LayoutTransition2(Texture texture, uint32_t step)
 	VkImageSubresourceRange subresource_range = vk->generic_subresource;
 	subresource_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 
+	//src_stage_mask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+	//src_access_mask = VK_ACCESS_2_MEMORY_WRITE_BIT; // VK_ACCESS_2_NONE if depth
+	//dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+	//dst_access_mask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
 	if (step == 0)
 	{
 		barrier = VkImageMemoryBarrier2
 		{
 			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
 			.pNext = nullptr,
-			.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-			.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-			.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
-			.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+			.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+			.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+			.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+			.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
 			.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 			.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.image = store->textures[texture.handle].image,
+			.image = store->textures[texture.index].image,
 			.subresourceRange = subresource_range,
 		};
+
+		store->textures[texture.index].layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	}
+
+	if (step == 1)
+	{
+		barrier = VkImageMemoryBarrier2
+		{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+			.pNext = nullptr,
+			.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+			.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+			.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+			.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+			.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = store->textures[texture.index].image,
+			.subresourceRange = subresource_range,
+		};
+
+		store->textures[texture.index].layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 	}
 
 	VkDependencyInfo dependency_info
@@ -1180,6 +1265,8 @@ void RenderDeviceVK::LayoutTransition2(Texture texture, uint32_t step)
 GPUBuffer RenderDeviceVK::CreateBuffer(GPUBuffer::Type type, uint32_t size, const void *data) // TODO: handle data pointer
 {
 	assert(size > 0);
+
+	//VkBufferUsageFlags usage_flags = vk::ConvertEnum(type);
 
 	VkBufferCreateInfo buffer_ci =
 	{
@@ -1204,7 +1291,7 @@ GPUBuffer RenderDeviceVK::CreateBuffer(GPUBuffer::Type type, uint32_t size, cons
 	VkMemoryRequirements memory_req;
 	vkGetBufferMemoryRequirements(vk->device, buffer, &memory_req);
 
-	MemoryType memory_type = type == GPUBuffer::Type::STAGING ? MemoryType::STAGING : MemoryType::HOST;
+	MemoryType memory_type = MemoryType::HOST;
 	uint32_t memory_type_index = vk->FindMemoryIndex(memory_req, memory_type);
 
 	VkMemoryAllocateInfo memory_alloc_info
@@ -1250,9 +1337,9 @@ void RenderDeviceVK::UpdateBuffer(GPUBuffer buffer, uint32_t size, const void *d
 	if (data != nullptr)
 	{
 		void *ptr = nullptr;
-		vkMapMemory(vk->device, store->buffers[buffer.handle].memory, offset, size, 0, &ptr);
+		vkMapMemory(vk->device, store->buffers[buffer.index].memory, offset, size, 0, &ptr);
 		memcpy(ptr, data, size);
-		vkUnmapMemory(vk->device, store->buffers[buffer.handle].memory);
+		vkUnmapMemory(vk->device, store->buffers[buffer.index].memory);
 		//vkDeviceWaitIdle(vk->device);
 	}
 }
@@ -1260,19 +1347,19 @@ void RenderDeviceVK::UpdateBuffer(GPUBuffer buffer, uint32_t size, const void *d
 void *RenderDeviceVK::MapBuffer(GPUBuffer buffer)
 {
 	void *ptr = nullptr;
-	vkMapMemory(vk->device, store->buffers[buffer.handle].memory, 0, buffer.size, 0, &ptr);
+	vkMapMemory(vk->device, store->buffers[buffer.index].memory, 0, buffer.size, 0, &ptr);
 	return ptr;
 }
 
 void RenderDeviceVK::UnMapBuffer(GPUBuffer buffer)
 {
-	vkUnmapMemory(vk->device, store->buffers[buffer.handle].memory);
+	vkUnmapMemory(vk->device, store->buffers[buffer.index].memory);
 }
 
 void RenderDeviceVK::BindVertexBuffer(GPUBuffer buffer)
 {
 	VkDeviceSize offsets[] = { 0 };
-	vkCmdBindVertexBuffers(vk->current_command_buffer, 0, 1, &store->buffers[buffer.handle].buffer, offsets);
+	vkCmdBindVertexBuffers(vk->current_command_buffer, 0, 1, &store->buffers[buffer.index].buffer, offsets);
 }
 
 DescriptorSet RenderDeviceVK::CreateDescriptorSet(PipelineID pipeline, Descriptor2::Set set)
@@ -1283,7 +1370,7 @@ DescriptorSet RenderDeviceVK::CreateDescriptorSet(PipelineID pipeline, Descripto
 		.pNext = nullptr,
 		.descriptorPool = store->descriptor_pool,
 		.descriptorSetCount = 1,
-		.pSetLayouts = &store->pipelines.at(pipeline.handle).decriptor_set_layouts.at(uint32_t(set)),
+		.pSetLayouts = &store->pipelines.at(pipeline.index).decriptor_set_layouts.at(uint32_t(set)),
 		//.pSetLayouts = &store->descriptor_layouts.at(std::to_underlying(set)),
 	};
 
@@ -1301,20 +1388,27 @@ void RenderDeviceVK::WriteDescriptor(DescriptorSet set, uint32_t binding, GPUBuf
 {
 	VkDescriptorBufferInfo buffer_info
 	{
-		.buffer = store->buffers.at(value.handle).buffer,
+		.buffer = store->buffers.at(value.index).buffer,
 		.offset = 0,
 		.range = value.size,
 	};
 
 	VkDescriptorType type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	if (value.type == GPUBuffer::Type::STORAGE)
-		type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	switch (value.type)
+	{
+		case GPUBuffer::Type::UNIFORM: type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; break;
+		case GPUBuffer::Type::STORAGE: type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; break;
+		default:
+			throw std::runtime_error("Descriptor buffer type unsupported");
+	}
+	//if (value.type == GPUBuffer::Type::STORAGE)
+	//	type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 
 	VkWriteDescriptorSet write_set
 	{
 		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 		.pNext = nullptr,
-		.dstSet = store->descriptor_sets.at(set.handle),
+		.dstSet = store->descriptor_sets.at(set.index),
 		.dstBinding = binding,
 		.dstArrayElement = 0,
 		.descriptorCount = 1,
@@ -1329,7 +1423,7 @@ void RenderDeviceVK::WriteDescriptor(DescriptorSet set, uint32_t binding, GPUBuf
 
 void RenderDeviceVK::WriteDescriptor(DescriptorSet set, uint32_t binding, Texture value, uint32_t index)
 {
-	vk::Texture texture = store->textures.at(value.handle);
+	vk::Texture texture = store->textures.at(value.index);
 	VkImageView image_view = texture.image_view;
 	VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
@@ -1364,7 +1458,7 @@ void RenderDeviceVK::WriteDescriptor(DescriptorSet set, uint32_t binding, Textur
 	{
 		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 		.pNext = nullptr,
-		.dstSet = store->descriptor_sets.at(set.handle),
+		.dstSet = store->descriptor_sets.at(set.index),
 		.dstBinding = binding,
 		.dstArrayElement = index,
 		.descriptorCount = 1,
@@ -1381,7 +1475,7 @@ void RenderDeviceVK::WriteDescriptor(DescriptorSet set, uint32_t binding, Textur
 void RenderDeviceVK::BindDescriptorSet(Descriptor2::Set index, DescriptorSet descriptor_set)
 {
 	vkCmdBindDescriptorSets(vk->current_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-					store->current_pipeline.layout, uint32_t(index), 1, &store->descriptor_sets.at(descriptor_set.handle), 0, nullptr);
+					store->current_pipeline.layout, uint32_t(index), 1, &store->descriptor_sets.at(descriptor_set.index), 0, nullptr);
 }
 
 /*void RenderDeviceVK::Push(Shader::Type type, uint32_t offset, glm::vec4 value)
@@ -1526,6 +1620,7 @@ Texture RenderDeviceVK::CreateTexture(const std::string &name, const TextureDesc
 
 	VkImageView image_view;
 	vkCreateImageView(vk->device, &image_view_ci, nullptr, &image_view);
+	vk->SetObjectName(VK_OBJECT_TYPE_IMAGE_VIEW, image_view, fmt::format("{} image view", name).c_str());
 
 	if (desc.pixels.empty())
 	{
@@ -1620,7 +1715,7 @@ FramebufferID RenderDeviceVK::CreateFramebuffer(const FramebufferDesc &desc)
 
 Framebuffer RenderDeviceVK::GetFramebuffer(FramebufferID framebuffer)
 {
-	return store->framebuffers[framebuffer.handle];
+	return store->framebuffers[framebuffer.index];
 }
 
 uint32_t RenderDeviceVK::GetFrameIndex() const
@@ -1631,6 +1726,70 @@ uint32_t RenderDeviceVK::GetFrameIndex() const
 uint32_t RenderDeviceVK::GetFrameCount() const
 {
 	return vk->frame_resources.size();
+}
+
+/*void RenderDeviceVK::CreateVertexSet()
+{
+	VkDescriptorSetLayout descriptor_set_layout = DescriptorSetLayoutBuilder()
+			.AddBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+			.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+			.Build(vk->device, store->descriptor_set_layouts);
+
+	for (uint32_t i = 0; i < frames_in_flight; i++)
+	{
+		GraphicsFrameData *data = &graphics_data.frame_data.at(i);
+
+		data->active_camera_ubo = CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4) * 2);
+		data->model_matrices_ubo = CreateBuffer(GPUBuffer::STORAGE, sizeof(glm::mat4) * 32);
+
+		VkDescriptorSetAllocateInfo alloc_info
+		{
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			.pNext = nullptr,
+			.descriptorPool = store->descriptor_pool,
+			.descriptorSetCount = 1,
+			.pSetLayouts = &descriptor_set_layout,
+		};
+
+		VkDescriptorSet descriptor_set;
+		vkAllocateDescriptorSets(vk->device, &alloc_info, &descriptor_set);
+		vk->SetObjectName(VK_OBJECT_TYPE_DESCRIPTOR_SET, descriptor_set, "vertex descriptor set");
+
+		store->descriptor_sets.push_back(descriptor_set);
+		data->vertex_set = { uint32_t(store->descriptor_sets.size() - 1) };
+		WriteDescriptor(data->vertex_set, 0, data->active_camera_ubo);
+		WriteDescriptor(data->vertex_set, 1, data->model_matrices_ubo);
+	}
+}*/
+
+void RenderDeviceVK::RegisterMaterial(uint32_t type, const std::vector<Descriptor2> &descriptors)
+{
+	DescriptorSetLayoutBuilder builder {};
+	for (auto &desc: descriptors)
+		builder.AddBinding(desc.binding, vk::ConvertEnum(desc.type), VK_SHADER_STAGE_FRAGMENT_BIT, desc.array_size);
+
+	store->material_set_layouts[type] = builder.Build(vk->device, store->descriptor_set_layouts);
+}
+
+DescriptorSet RenderDeviceVK::CreateMaterialDescriptorSet(uint32_t type)
+{
+	VkDescriptorSetAllocateInfo alloc_info
+	{
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+		.pNext = nullptr,
+		.descriptorPool = store->descriptor_pool,
+		.descriptorSetCount = 1,
+		.pSetLayouts = &store->material_set_layouts.at(type),
+	};
+
+	VkDescriptorSet descriptor_set;
+	vkAllocateDescriptorSets(vk->device, &alloc_info, &descriptor_set);
+
+	vk->SetObjectName(VK_OBJECT_TYPE_DESCRIPTOR_SET, descriptor_set,
+					  fmt::format("material set {}", store->descriptor_sets.size()).c_str());
+
+	store->descriptor_sets.push_back(descriptor_set);
+	return { { uint32_t(store->descriptor_sets.size() - 1) } };
 }
 
 

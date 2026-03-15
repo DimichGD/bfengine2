@@ -1,5 +1,6 @@
 #version 460 core
 #pragma shader_stage(vertex)
+#extension GL_ARB_separate_shader_objects: enable // ENABLE everywhere
 
 layout(location = 0) in vec3 IN_POSITION;
 //layout(location = 1) in vec2 IN_TEXCOORD_0;

@@ -16,6 +16,8 @@ public:
 	virtual ~IMaterial() = default;
 	virtual void Setup(RenderDevice *device, DescriptorSet descriptor_set) = 0;
 	virtual void Setup2(RenderDevice *device, GraphicsContext *context, Descriptor2::Set set_index, DescriptorSet descriptor_set) {}
+	//virtual uint32_t Type() { return UINT32_MAX; }
+	//virtual std::vector<Descriptor2> Descriptors() { return {}; }
 };
 
 class Material: public IMaterial
@@ -87,13 +89,29 @@ public:
 
 	void Setup2(RenderDevice *device, GraphicsContext *context, Descriptor2::Set set_index, DescriptorSet descriptor_set) override
 	{
-		// for (uint32_t i = 0; i < textures.size(); i++)
-		// 	device->WriteDescriptor(descriptor_set, i, textures.at(i));
-
 		for (uint32_t i = 0; i < textures.size(); i++)
-			device->WriteDescriptor(descriptor_set, 0, textures.at(i), index + i);
+			device->WriteDescriptor(descriptor_set, i, textures.at(i));
+
+		//for (uint32_t i = 0; i < textures.size(); i++)
+		//	device->WriteDescriptor(descriptor_set, 0, textures.at(i), index + i);
 	}
 
+	static uint32_t Type()
+	{
+		return 0;
+	}
+
+	static std::vector<Descriptor2> Descriptors()
+	{
+		return
+		{
+			{ 1, 0, Descriptor2::Type::TEXTURE, 1 },
+			{ 1, 1, Descriptor2::Type::TEXTURE, 1 },
+			{ 1, 2, Descriptor2::Type::TEXTURE, 1 },
+		};
+	}
+
+	DescriptorSet set {};
 	uint32_t index;
 	std::string name;
 

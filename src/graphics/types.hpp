@@ -109,36 +109,46 @@ struct Handle
 		TEXTURE,
 	};
 
-	uint32_t handle = UINT32_MAX;
+	uint64_t index: 32 = UINT32_MAX;
+	uint64_t gen: 16 = 0;
+	uint64_t flags: 16 = 0;
+
+	Handle() {}
+
+	Handle(uint32_t index)
+	{
+		this->index = index;
+	}
 
 	explicit operator bool() const
 	{
-		return handle != UINT32_MAX;
+		return index != UINT32_MAX;
 	}
 
 	bool operator<(const Handle &other) const
 	{
-		return handle < other.handle;
+		return index < other.index || gen < other.gen || flags < other.flags; // TODO: ???
 	}
 
 	bool operator==(const Handle &other) const
 	{
-		return handle == other.handle;
+		return index == other.index && gen == other.gen && flags == other.flags;
 	}
 };
 
 struct GPUBuffer: Handle
 {
-	enum class Type
+	enum class Type: uint8_t
 	{
 		VERTEX,
 		INDEX,
 		UNIFORM,
 		STORAGE,
-		STAGING,
+		INDIRECT,
+		//STAGING,
 	};
 
-	enum class Flags
+	enum class Flags: uint8_t
 	{
 		STATIC_READ,
 	};
@@ -160,16 +170,16 @@ struct Shader: Handle
 		COMPUTE,
 	};
 
-	Shader(uint32_t handle, Type type)
+	Shader(uint32_t index, Type type)
 	{
-		this->handle = handle;
+		this->index = index;
 		this->type = type;
 	}
 
-	Shader()
+	Shader(): Handle()
 	{
-		this->handle = 0;
-		this->type = {};
+		//this->index = 0;
+		//this->type = {};
 	}
 
 	Type type;
@@ -255,7 +265,7 @@ struct Constant
 
 struct DescriptorSet: Handle {};
 
-struct ShaderReflectionData
+/*struct ShaderReflectionData
 {
 	std::string name;
 	uint32_t max_set = 0;
@@ -263,7 +273,7 @@ struct ShaderReflectionData
 
 	std::vector<Constant> constants;
 	std::array<std::vector<Descriptor2>, 4> sets {};
-};
+};*/
 
 struct Uniform
 {
