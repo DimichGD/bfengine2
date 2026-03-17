@@ -5,6 +5,7 @@
 #include "utils/parser.hpp"
 #include <SDL3_image/SDL_image.h>
 #include <fmt/format.h>
+#include <glm/gtc/type_ptr.hpp>
 
 BF_BEGIN_NAMESPACE
 
@@ -13,7 +14,12 @@ ResourceManager::ResourceManager(RenderDevice *device, FileSystem *fs)
 	this->device = device;
 	this->fs = fs;
 
-	static_cast<RenderDeviceVK *>(device)->RegisterMaterial(CustomMaterial::Type(), CustomMaterial::Descriptors());
+	/*static_cast<RenderDeviceVK *>(device)->RegisterMaterial(CustomMaterial::Type(), CustomMaterial::Bindings());
+	static_cast<RenderDeviceVK *>(device)->RegisterMaterial(Material::Type(), Material::Bindings());
+	static_cast<RenderDeviceVK *>(device)->RegisterMaterial(ColorMaterial::Type(), ColorMaterial::Bindings());*/
+	static_cast<RenderDeviceVK *>(device)->RegisterDescriptorLayout("Custom Material", CustomMaterial::Bindings());
+	static_cast<RenderDeviceVK *>(device)->RegisterDescriptorLayout("Color Material", ColorMaterial::Bindings());
+	static_cast<RenderDeviceVK *>(device)->RegisterDescriptorLayout("Material", Material::Bindings());
 
 	File def_file(fs->GetDataPath() + "shaders/shaders.def");
 	def_file.Open();
@@ -29,17 +35,18 @@ ResourceManager::ResourceManager(RenderDevice *device, FileSystem *fs)
 	Parser parser2(buffer);
 	//material_defs.merge(parser2.DoStuff2());
 	//uint32_t mat_index = 0;
-	for (auto mat: parser2.DoStuff2())
+	for (auto &[name, mat]: parser2.DoStuff2())
 	{
 		std::vector<Texture> textures;
 
-		for (auto tex: mat.second)
-			textures.push_back(LoadTexture(tex.first, tex.second));
+		for (auto [name, format]: mat)
+			textures.push_back(LoadTexture(name, format));
 
-		auto material = std::make_shared<CustomMaterial>(mat.first, textures, 0);
-		material->set = static_cast<RenderDeviceVK *>(device)->CreateMaterialDescriptorSet(CustomMaterial::Type());
-		material->Setup2(device, nullptr, Descriptor2::Set::MATERIAL, material->set);
-		materials[mat.first] = material;
+		//DescriptorSet set = static_cast<RenderDeviceVK *>(device)->CreateMaterialDescriptorSet(CustomMaterial::Type());
+		//auto material = std::make_shared<CustomMaterial>(name, device, textures, 0);
+		//material->set = static_cast<RenderDeviceVK *>(device)->CreateMaterialDescriptorSet(CustomMaterial::Type());
+		//material->Setup2(device, nullptr, {}, material->set);
+		materials[name] = std::make_shared<CustomMaterial>(name, device, textures, 0);
 		//materials[mat.first] = std::make_shared<CustomMaterial>(mat.first, textures, mat_index);
 
 		//mat_index += 3;
@@ -47,7 +54,27 @@ ResourceManager::ResourceManager(RenderDevice *device, FileSystem *fs)
 
 	std::string material_name = "red.png";
 	Texture tex_d = LoadTexture(material_name);
-	materials[material_name] = std::make_shared<Material>(tex_d);
+	materials[material_name] = std::make_shared<Material>(device, tex_d);
+
+	RenderDeviceVK *vk_device = static_cast<RenderDeviceVK *>(device);
+	colors_ubo = vk_device->CreateBuffer2(GPUBuffer::UNIFORM, 4 * vk_device->ubo_alignment);
+
+	std::vector<glm::vec4> colors
+	{
+		{ 1.0f, 1.0f, 1.0f, 1.0f },
+		{ 1.0f, 0.0f, 0.0f, 1.0f },
+		{ 0.0f, 1.0f, 0.0f, 1.0f },
+		{ 0.0f, 0.0f, 1.0f, 1.0f },
+	};
+
+	uint32_t offset = 0;
+	for (auto color: colors)
+	{
+		vk_device->UpdateBuffer(colors_ubo, sizeof(glm::vec4), glm::value_ptr(color), offset);
+		offset += vk_device->ubo_alignment;
+	}
+
+	materials["grid_material"] = std::make_shared<ColorMaterial>(device, colors_ubo, glm::vec4(1.0f));
 }
 
 
@@ -305,7 +332,9 @@ Mesh ResourceManager::LoadMesh(std::string_view filename)
 		{
 			/*Texture tex_d = LoadTexture(material_name);
 			Material *mat = new Material(tex_d);*/
-			surfaces[i] = { { vertex_start, vertex_count }, LoadMaterial(material_name), 0, {} };
+			//surfaces[i] = { { vertex_start, vertex_count }, LoadMaterial(material_name), 0, {} };
+			auto material = std::static_pointer_cast<Material>(LoadMaterial(material_name));
+			surfaces[i] = { { vertex_start, vertex_count }, material, 0, material->set };
 		}
 
 		if (version == 3)
@@ -316,7 +345,7 @@ Mesh ResourceManager::LoadMesh(std::string_view filename)
 			PhongMaterial *mat = new PhongMaterial(tex_d, tex_n, tex_s);*/
 			//Log() << material_name;
 			auto material = std::static_pointer_cast<CustomMaterial>(LoadMaterial(material_name));
-			surfaces[i] = { { vertex_start, vertex_count }, material, material->index, material->set };
+			surfaces[i] = { { vertex_start, vertex_count }, material, 0, material->set };
 		}
 	}
 
@@ -327,8 +356,8 @@ Mesh ResourceManager::LoadMesh(std::string_view filename)
 	std::vector<char> verts(vertex_count * vertex_stride);
 	mesh_file.Read(verts.data(), vertex_count * vertex_stride);
 
-	GPUBuffer vbo = device->CreateBuffer(GPUBuffer::VERTEX, verts);
-	return { .name = std::string(filename), .surfaces = surfaces, .vbo = vbo, .matrix_index = 0 };
+	GPUBuffer vbo = static_cast<RenderDeviceVK *>(device)->CreateBuffer2(GPUBuffer::VERTEX, verts);
+	return { /*.name = std::string(filename),*/ .surfaces = surfaces, .vbo = vbo, .matrix_index = 0 };
 }
 
 BF_END_NAMESPACE

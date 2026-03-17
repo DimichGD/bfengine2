@@ -20,6 +20,37 @@ public:
 	//virtual std::vector<Descriptor2> Descriptors() { return {}; }
 };
 
+class ColorMaterial: public IMaterial
+{
+public:
+	ColorMaterial(RenderDevice *device, GPUBuffer buffer, glm::vec4 color)
+	{
+		set = static_cast<RenderDeviceVK *>(device)->CreateDescriptorSet("Color Material");
+		uint32_t alignment = static_cast<RenderDeviceVK *>(device)->ubo_alignment;
+		static_cast<RenderDeviceVK *>(device)->WriteDescriptor2(set, 0, buffer, 0 * alignment, sizeof(glm::vec4));
+	}
+
+	void Setup(RenderDevice *device, DescriptorSet descriptor_set) override
+	{
+		//device->WriteDescriptor(descriptor_set, 0, diffuse_map);
+	}
+
+	static uint32_t Type()
+	{
+		return 2;
+	}
+
+	static std::vector<Descriptor3> Bindings()
+	{
+		return
+		{
+			{ 0, Descriptor3::Type::UNIFORM_BUFFER, 1, Shader::Type::FRAGMENT },
+		};
+	}
+
+	DescriptorSet set;
+};
+
 class Material: public IMaterial
 {
 public:
@@ -28,16 +59,32 @@ public:
 		this->diffuse_map = diffuse_map;
 	}
 
+	Material(RenderDevice *device, Texture texture)
+	{
+		set = static_cast<RenderDeviceVK *>(device)->CreateDescriptorSet("Material");
+		device->WriteDescriptor(set, 0, texture);
+	}
+
 	void Setup(RenderDevice *device, DescriptorSet descriptor_set) override
 	{
 		device->WriteDescriptor(descriptor_set, 0, diffuse_map);
 	}
 
+	static std::vector<Descriptor3> Bindings()
+	{
+		return
+		{
+			{ 0, Descriptor3::Type::TEXTURE, 1, Shader::Type::FRAGMENT },
+		};
+	}
+
+	DescriptorSet set {};
+
 private:
 	Texture diffuse_map;
 };
 
-class PhongMaterial: public IMaterial
+/*class PhongMaterial: public IMaterial
 {
 public:
 	PhongMaterial(Texture diffuse_map, Texture normal_map, Texture specular_map)
@@ -58,28 +105,27 @@ private:
 	Texture diffuse_map;
 	Texture normal_map;
 	Texture specular_map;
-};
+};*/
 
 
 
-struct MaterialID: Handle {};
-
-
-
-struct TextureInputDesc
-{
-	//std::string slot_name;
-	Texture::Format format;
-};
+//struct MaterialID: Handle {};
 
 class CustomMaterial: public IMaterial
 {
 public:
-	CustomMaterial(std::string name, const std::vector<Texture> &textures, uint32_t index)
+	CustomMaterial(std::string name, RenderDevice *device, const std::vector<Texture> &textures, uint32_t index)
 	{
-		this->textures = std::move(textures);
+		//this->textures = std::move(textures);
 		this->name = name;
-		this->index = index;
+		//this->set = static_cast<RenderDeviceVK *>(device)->CreateMaterialDescriptorSet(Type());
+		this->set = static_cast<RenderDeviceVK *>(device)->CreateDescriptorSet("Custom Material");
+		//this->index = index;
+
+		assert(textures.size() == 3);
+		device->WriteDescriptor(set, 0, textures[0]);
+		device->WriteDescriptor(set, 1, textures[1]);
+		device->WriteDescriptor(set, 2, textures[2]);
 	}
 
 	void Setup(RenderDevice *device, DescriptorSet descriptor_set) override
@@ -89,34 +135,29 @@ public:
 
 	void Setup2(RenderDevice *device, GraphicsContext *context, Descriptor2::Set set_index, DescriptorSet descriptor_set) override
 	{
-		for (uint32_t i = 0; i < textures.size(); i++)
-			device->WriteDescriptor(descriptor_set, i, textures.at(i));
+		//for (uint32_t i = 0; i < textures.size(); i++)
+		//	device->WriteDescriptor(descriptor_set, i, textures.at(i));
 
 		//for (uint32_t i = 0; i < textures.size(); i++)
 		//	device->WriteDescriptor(descriptor_set, 0, textures.at(i), index + i);
 	}
 
-	static uint32_t Type()
-	{
-		return 0;
-	}
-
-	static std::vector<Descriptor2> Descriptors()
+	static std::vector<Descriptor3> Bindings()
 	{
 		return
 		{
-			{ 1, 0, Descriptor2::Type::TEXTURE, 1 },
-			{ 1, 1, Descriptor2::Type::TEXTURE, 1 },
-			{ 1, 2, Descriptor2::Type::TEXTURE, 1 },
+			{ 0, Descriptor3::Type::TEXTURE, 1, Shader::Type::FRAGMENT },
+			{ 1, Descriptor3::Type::TEXTURE, 1, Shader::Type::FRAGMENT },
+			{ 2, Descriptor3::Type::TEXTURE, 1, Shader::Type::FRAGMENT },
 		};
 	}
 
 	DescriptorSet set {};
-	uint32_t index;
+	//uint32_t index;
 	std::string name;
 
 private:
-	std::vector<Texture> textures;
+	//std::vector<Texture> textures;
 };
 
 struct Surface
@@ -131,7 +172,7 @@ struct Surface
 struct Mesh
 {
 	//Range surfaces {};
-	std::string name;
+	//std::string name;
 	std::vector<Surface> surfaces;
 	GPUBuffer vbo {};
 	uint32_t matrix_index = 0;
@@ -152,6 +193,8 @@ public:
 
 	Mesh    LoadMesh(std::string_view filename);
 
+	GPUBuffer colors_ubo;
+
 private:
 	RenderDevice *device = nullptr;
 	FileSystem *fs = nullptr;
@@ -160,6 +203,8 @@ private:
 	std::map<std::string, ShaderDesc> shader_descriptions;
 	std::map<std::string, std::shared_ptr<IMaterial>> materials;
 	//std::map<std::string, std::vector<std::pair<std::string, Texture::Format>>> material_defs;
+
+
 };
 
 BF_END_NAMESPACE

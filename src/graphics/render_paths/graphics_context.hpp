@@ -30,6 +30,9 @@ struct GraphicsContext
 	GPUBuffer camera_light_data {};
 
 	GPUBuffer text_vbo {};
+
+	DescriptorSet global_3d_set {};
+	DescriptorSet global_2d_set {};
 };
 
 BF_END_NAMESPACE

@@ -12,7 +12,7 @@ Deferred::Deferred(RenderDevice *device, Config *config, ResourceManager *resour
 	this->height = config->window.height;
 }
 
-void Deferred::Create(std::vector<GraphicsContext> &context, FramebufferID out_fbo)
+void Deferred::Create(GraphicsContext &context, FramebufferID out_fbo)
 {
 	//this->context = context;
 	//const char *deferred_texture_shader_name = config->render.api == Config::Render::API::VK ? "deferred/vk_texture" : "deferred/gl_texture";
@@ -22,6 +22,9 @@ void Deferred::Create(std::vector<GraphicsContext> &context, FramebufferID out_f
 	Shader fs = resources->LoadShader("deferred fragment diffuse normal specular");
 	//Shader fs = device->LoadShader(Shader::Type::FRAGMENT, deferred_texture_shader_name);
 
+	RenderDeviceVK *vk_device = static_cast<RenderDeviceVK *>(device);
+
+
 	PipelineDesc pipeline_desc
 	{
 		.shaders = { vs, fs },
@@ -29,15 +32,18 @@ void Deferred::Create(std::vector<GraphicsContext> &context, FramebufferID out_f
 		.vertex_attribs = Vertex::Attrib::POSITION | Vertex::Attrib::TEXCOORD_0 | Vertex::Attrib::NORMAL | Vertex::Attrib::TANGENT,
 		.raster = {},
 		.framebuffer_id = out_fbo,
+		.descriptor_layouts = { "Global 3D", "Custom Material" },
+		.constants = { EngineConstants::OBJECT_INDEX },
 	};
 
 	pipeline = device->CreatePipeline("deferred/static_meshes", pipeline_desc);
 
-	for (uint32_t i = 0; i < static_cast<RenderDeviceVK *>(device)->GetFrameCount(); i++)
+	//for (uint32_t i = 0; i < static_cast<RenderDeviceVK *>(device)->GetFrameCount(); i++)
 	{
-		scene_set[i] = device->CreateDescriptorSet(pipeline, Descriptor2::Set::SCENE);
-		device->WriteDescriptor(scene_set[i], 0, context[i].active_camera_ubo);
-		device->WriteDescriptor(scene_set[i], 1, context[i].model_matrices_ubo);
+		//scene_set = device->CreateDescriptorSet(pipeline, Descriptor2::Set::SCENE);
+		//scene_set = vk_device->CreateDescriptorSet("Global 3D");
+		//device->WriteDescriptor(context.global_3d_set, 0, context.active_camera_ubo);
+		//device->WriteDescriptor(context.global_3d_set, 1, context.model_matrices_ubo);
 	}
 
 	//material_set = device->CreateDescriptorSet(pipeline, Descriptor2::Set::MATERIAL);
@@ -48,12 +54,12 @@ void Deferred::Destroy()
 	//
 }
 
-void Deferred::Render(std::vector<Mesh> &meshes, uint32_t current_index)
+void Deferred::Render(GraphicsContext &context, std::vector<Mesh> &meshes, uint32_t current_index)
 {
 	//device->BeginRenderPass(gbuffer, RenderPass::Clear::COLOR_DEPTH);
 
 	device->BindPipeline(pipeline);
-	device->BindDescriptorSet(Descriptor2::Set::SCENE, scene_set[current_index]);
+	device->BindDescriptorSet(Descriptor2::Set::SCENE, context.global_3d_set);
 	//device->BindDescriptorSet(Descriptor2::Set::SCENE, static_cast<RenderDeviceVK *>(device)->graphics_data.frame_data[current_index].vertex_set);
 	//device->BindDescriptorSet(Descriptor2::Set::MATERIAL, static_cast<RenderDeviceVK *>(device)->graphics_data.textures_set);
 

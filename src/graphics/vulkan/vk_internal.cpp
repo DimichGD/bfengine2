@@ -122,18 +122,19 @@ void RenderDeviceVK::Internal::ChoosePhysicalDevice()
 
 	vkGetPhysicalDeviceMemoryProperties(phys_device, &memory_properties);
 
-	/*VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_props {};
-	descriptor_buffer_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_PROPERTIES_EXT;
+	//VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_props {};
+	//descriptor_buffer_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_PROPERTIES_EXT;
 
 	VkPhysicalDeviceProperties2 props
 	{
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-		.pNext = &descriptor_buffer_props,
+		.pNext = nullptr,
 		.properties = {},
 	};
 	vkGetPhysicalDeviceProperties2(phys_device, &props);
+	device_properties = props.properties;
 
-	Log() << descriptor_buffer_props.descriptorBufferOffsetAlignment;*/
+	//Log() << descriptor_buffer_props.descriptorBufferOffsetAlignment;
 
 	//Log() << props.properties.limits.minUniformBufferOffsetAlignment << props.properties.limits.minStorageBufferOffsetAlignment;
 }

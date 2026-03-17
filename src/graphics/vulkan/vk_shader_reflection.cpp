@@ -472,7 +472,7 @@ void CreatePipelineLayout(VkDevice device, Pipeline &pipeline,
 						  const std::vector<ShaderDesc> &reflection_data)
 {
 	std::array<std::vector<StageDescriptor>, 4> combined_descriptors;
-	std::vector<ConstantRange> combined_constants;
+	std::vector<VkPushConstantRange> combined_constants;
 
 	uint32_t texture_index = 0;
 	for (auto &data: reflection_data)
@@ -520,7 +520,7 @@ void CreatePipelineLayout(VkDevice device, Pipeline &pipeline,
 
 		for (auto &constant: data.constants)
 		{
-			ConstantRange range;
+			VkPushConstantRange range;
 			switch (constant)
 			{
 				case EngineConstants::OBJECT_INDEX: range = { vk::ConvertEnum(data.type), 0, 4 }; break;
@@ -529,14 +529,14 @@ void CreatePipelineLayout(VkDevice device, Pipeline &pipeline,
 				case EngineConstants::TIME: range = { vk::ConvertEnum(data.type), 12, 4 }; break;
 			}
 
-			auto it = std::find_if(combined_constants.begin(), combined_constants.end(),
+			/*auto it = std::find_if(combined_constants.begin(), combined_constants.end(),
 				[&range](const ConstantRange &other)
 					{ return other.offset == range.offset && other.size == range.size; });
 
 			if (it != combined_constants.end())
-				it->stage_flags |= vk::ConvertEnum(data.type);
+				it->stageFlags |= vk::ConvertEnum(data.type);
 
-			else
+			else*/
 				combined_constants.push_back(range);
 		}
 	}
@@ -626,14 +626,7 @@ void CreatePipelineLayout(VkDevice device, Pipeline &pipeline,
 	uint32_t range_index = 0;
 	for (auto &constant: combined_constants)
 	{
-		VkPushConstantRange range
-		{
-			.stageFlags = constant.stage_flags,
-			.offset = constant.offset,
-			.size = constant.size,
-		};
-
-		push_constant_ranges.push_back(range);
+		push_constant_ranges.push_back(constant);
 		pipeline.constant_ranges.at(range_index++) = constant;
 	}
 

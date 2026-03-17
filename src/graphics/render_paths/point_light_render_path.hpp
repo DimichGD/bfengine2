@@ -12,9 +12,9 @@ public:
 	BF_NON_MOVABLE(PointLightRenderPath)
 	BF_NON_COPYABLE(PointLightRenderPath)
 
-	void Create(std::vector<GraphicsContext> &context, const std::vector<Texture> &textures, Texture depth_texture, FramebufferID out_fbo);
+	void Create(GraphicsContext &context, const std::vector<Texture> &textures, Texture depth_texture, FramebufferID out_fbo);
 	void Destroy();
-	void Render(uint32_t current_index);
+	void Render(GraphicsContext &context, uint32_t current_index);
 
 private:
 	//RenderDeviceVK *device = nullptr;
@@ -28,8 +28,8 @@ private:
 	//FramebufferID light_buffer {};
 	float width = 0.0f;
 	float height = 0.0f;
-	DescriptorSet scene_set[3] {};
-	DescriptorSet material_set[3] {};
+	//DescriptorSet scene_set {};
+	DescriptorSet material_set {};
 	GPUBuffer quad_vbo {};
 	GPUBuffer sphere_vbo {};
 	uint32_t sphere_vertex_count = 0;

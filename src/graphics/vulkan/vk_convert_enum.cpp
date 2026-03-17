@@ -21,12 +21,13 @@ VkBufferUsageFlags ConvertEnum(GPUBuffer::Type type)
 {
 	switch (type)
 	{
+		case GPUBuffer::Type::NONE:     throw std::runtime_error("Uninitialized GPUBuffer");
 		case GPUBuffer::Type::VERTEX:   return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 		case GPUBuffer::Type::INDEX:    return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 		case GPUBuffer::Type::UNIFORM:  return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		case GPUBuffer::Type::STORAGE:  return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 		case GPUBuffer::Type::INDIRECT: return VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-		//case GPUBuffer::Type::STAGING: return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		//case GPUBuffer::Type::STAGING:  return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	}
 
 	return {};
@@ -113,6 +114,16 @@ VkDescriptorType ConvertEnum(Descriptor2::Type type)
 	}
 
 	return {};
+}
+
+VkDescriptorType ConvertEnum(Descriptor3::Type type)
+{
+	switch (type)
+	{
+		case Descriptor3::Type::UNIFORM_BUFFER: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		case Descriptor3::Type::STORAGE_BUFFER: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		case Descriptor3::Type::TEXTURE:        return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	}
 }
 
 VkCompareOp ConvertEnum(DepthFunc func)

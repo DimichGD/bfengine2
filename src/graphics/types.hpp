@@ -1,5 +1,6 @@
 #pragma once
 #include "utils/enum_operators.hpp"
+#include <exception>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
@@ -109,15 +110,24 @@ struct Handle
 		TEXTURE,
 	};
 
-	uint64_t index: 32 = UINT32_MAX;
+	/*uint64_t index: 32 = UINT32_MAX;
 	uint64_t gen: 16 = 0;
-	uint64_t flags: 16 = 0;
+	uint64_t user_data: 16 = 0;*/
+	uint32_t index = UINT32_MAX;
+	uint16_t gen = 0;
+	uint16_t flags = 0;
 
 	Handle() {}
 
 	Handle(uint32_t index)
 	{
 		this->index = index;
+	}
+
+	Handle(uint32_t index, uint16_t gen)
+	{
+		this->index = index;
+		this->gen = gen;
 	}
 
 	explicit operator bool() const
@@ -140,6 +150,7 @@ struct GPUBuffer: Handle
 {
 	enum class Type: uint8_t
 	{
+		NONE,
 		VERTEX,
 		INDEX,
 		UNIFORM,
@@ -148,16 +159,18 @@ struct GPUBuffer: Handle
 		//STAGING,
 	};
 
-	enum class Flags: uint8_t
+	/*enum class Flags: uint8_t
 	{
-		STATIC_READ,
-	};
+		NONE,
+		STAGING,
+	};*/
 
 	using enum Type;
-	using enum Flags;
+	//using enum Flags;
 
-	uint32_t size = 0;
-	Type type = {};
+	//uint32_t size = 0;
+	Type type = Type::NONE;
+	//uint8_t flags = 0;
 };
 
 struct Shader: Handle
@@ -239,6 +252,35 @@ struct Descriptor2
 	Type type = Type::UNIFORM_BUFFER;
 	uint8_t array_size = 0;
 	//Shader::Type stage = Shader::Type::VERTEX;
+};
+
+struct Descriptor3
+{
+	enum class Type: uint8_t
+	{
+		UNIFORM_BUFFER,
+		STORAGE_BUFFER,
+		TEXTURE,
+	};
+
+	Descriptor3() = delete;
+	Descriptor3(uint8_t binding, Type type, uint8_t array_size, Shader::Type stage)
+	{
+		this->binding = binding;
+		this->type = type;
+		this->array_size = array_size;
+		this->stage = stage;
+	}
+
+	uint32_t Hash() const
+	{
+		return binding | (uint8_t(type) << 8) | (array_size << 16) << (uint8_t(stage) << 24);
+	}
+
+	uint8_t binding = 0;
+	Type type = Type::UNIFORM_BUFFER;
+	uint8_t array_size = 0; // TODO: do i need this?
+	Shader::Type stage;
 };
 
 struct Constant
@@ -402,17 +444,17 @@ enum class ImageLayout
 
 struct Texture: Handle
 {
-	enum class Format
+	enum class Format: uint8_t
 	{
 		BGR8, BGRA8,
 		R8, RG8, RGB8, RGBA8,
 		SBGRA8, SRGBA8,
 		RGBA16F,
-		D24, D24S8, D32F,
 		BC1,
+		D24, D24S8, D32F,
 	};
 
-	enum class Usage
+	enum class Usage: uint8_t
 	{
 		SHADER_READ      = 1 << 0,
 		COLOR_ATTACHMENT = 1 << 1,
@@ -425,22 +467,13 @@ struct Texture: Handle
 	{
 		switch (format)
 		{
-			case Format::BGR8:
-			case Format::BGRA8:
-			case Format::R8:
-			case Format::RG8:
-			case Format::RGB8:
-			case Format::RGBA8:
-			case Format::SBGRA8:
-			case Format::SRGBA8:
-			case Format::RGBA16F:
-			case Format::BC1:
-				return false;
-
 			case Format::D24:
 			case Format::D24S8:
 			case Format::D32F:
 				return true;
+
+			default:
+				return false;
 		}
 	}
 };
@@ -487,6 +520,7 @@ struct Framebuffer
 };
 
 struct FramebufferID: Handle {};
+//using FramebufferID = Handle;
 
 struct FramebufferDesc
 {
@@ -497,6 +531,14 @@ struct FramebufferDesc
 	Texture depth_texture {};
 };
 
+enum class EngineConstants
+{
+	OBJECT_INDEX,
+	MATERIAL_INDEX,
+	FACTOR,
+	TIME,
+};
+
 struct PipelineDesc
 {
 	std::vector<Shader> shaders;
@@ -504,6 +546,8 @@ struct PipelineDesc
 	Vertex::Attrib vertex_attribs;
 	Raster raster;
 	FramebufferID framebuffer_id;
+	std::vector<std::string> descriptor_layouts {};
+	std::vector<EngineConstants> constants {};
 };
 
 struct Pipeline

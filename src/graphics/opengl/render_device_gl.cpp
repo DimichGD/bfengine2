@@ -391,23 +391,24 @@ GPUBuffer RenderDeviceGL::CreateBuffer(GPUBuffer::Type type, uint32_t size, cons
 
 	glNamedBufferStorage(buffer, size, data, flags);
 
-	return GPUBuffer { { buffer }, size, type };
+	return GPUBuffer { { buffer }, type }; // TODO: proper gl::Buffer type
 }
 
 void RenderDeviceGL::UpdateBuffer(GPUBuffer buffer, uint32_t size, const void *data, uint32_t offset)
 {
-	if (size > buffer.size)
+	/*if (size > buffer.size)
 	{
 		Log() << "size" << size <<  ">" << "buffer.size" << buffer.size;
 		return;
-	}
+	}*/
 
 	glNamedBufferSubData(buffer.index, offset, size, data);
 }
 
-void *RenderDeviceGL::MapBuffer(GPUBuffer buffer)
+std::span<std::byte> RenderDeviceGL::MapBuffer(GPUBuffer buffer)
 {
-	return glMapNamedBuffer(buffer.index, GL_WRITE_ONLY);
+	throw std::runtime_error("Opengl buffer size is not implemented");
+	return { static_cast<std::byte *>(glMapNamedBuffer(buffer.index, GL_WRITE_ONLY)), 0 };
 }
 
 void RenderDeviceGL::UnMapBuffer(GPUBuffer buffer)

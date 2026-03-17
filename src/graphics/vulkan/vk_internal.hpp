@@ -14,7 +14,9 @@ BF_BEGIN_VK_NAMESPACE
 struct Buffer
 {
 	VkBuffer buffer;
+	uint32_t buffer_size;
 	VkDeviceMemory memory;
+	VkDeviceSize memory_size;
 };
 
 struct Texture
@@ -25,19 +27,19 @@ struct Texture
 	VkImageLayout layout;
 };
 
-struct ConstantRange
+/*struct ConstantRange
 {
 	VkShaderStageFlags stage_flags;
 	uint32_t offset = 0;
 	uint32_t size = 0;
-};
+};*/
 
 struct Pipeline
 {
 	VkPipeline pipeline;
 	VkPipelineLayout layout;
 	std::vector<VkDescriptorSetLayout> decriptor_set_layouts;
-	std::array<ConstantRange, 6> constant_ranges {};
+	std::array<VkPushConstantRange, 6> constant_ranges {};
 	std::vector<DescriptorSet> descriptors;
 };
 
@@ -143,6 +145,7 @@ struct RenderDeviceVK::Internal
 	uint32_t device_memory_type_index = 1;
 	uint32_t staging_memory_type_index = 5;*/
 	VkPhysicalDeviceMemoryProperties memory_properties {};
+	VkPhysicalDeviceProperties device_properties {};
 
 	//VkBuffer staging_buffer = VK_NULL_HANDLE;
 	//VkDeviceMemory staging_memory = VK_NULL_HANDLE;

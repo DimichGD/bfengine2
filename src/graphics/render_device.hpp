@@ -46,16 +46,16 @@ public:
 	void UpdateBuffer(GPUBuffer buffer, const std::vector<T> &vector)
 		{ return UpdateBuffer(buffer, vector.size() * sizeof(T), vector.data()); }
 
-	template<typename T>
+	/*template<typename T>
 	std::span<T> MapBuffer(GPUBuffer buffer)
 	{
 		T *t = reinterpret_cast<T*>(MapBuffer(buffer));
 		return { t, size_t(buffer.size / sizeof(T)) };
-	}
+	}*/
 
 	virtual GPUBuffer CreateBuffer(GPUBuffer::Type type, uint32_t size, const void *data = nullptr) = 0;
 	virtual void UpdateBuffer(GPUBuffer buffer, uint32_t size, const void *data, uint32_t offset = 0) = 0;
-	virtual void *MapBuffer(GPUBuffer buffer) = 0;
+	virtual std::span<std::byte> MapBuffer(GPUBuffer buffer) = 0;
 	virtual void UnMapBuffer(GPUBuffer buffer) = 0;
 
 	virtual Texture CreateTexture(const std::string &name, const TextureDesc &desc) = 0;

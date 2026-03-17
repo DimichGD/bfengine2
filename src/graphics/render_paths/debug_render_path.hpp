@@ -12,9 +12,9 @@ public:
 	BF_NON_MOVABLE(Debug)
 	BF_NON_COPYABLE(Debug)
 
-	void Create(std::vector<GraphicsContext> &context, FramebufferID out_fbo);
+	void Create(GraphicsContext &context, FramebufferID out_fbo);
 	void Destroy();
-	void Render(std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2, uint32_t current_index);
+	void Render(GraphicsContext &context, std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2, uint32_t current_index);
 
 private:
 	//RenderDeviceVK *device = nullptr;
@@ -28,8 +28,8 @@ private:
 
 	PipelineID pipeline_meshes {};
 	PipelineID pipeline_lines {};
-	DescriptorSet scene_set_lines[3] {};
-	DescriptorSet scene_set_meshes[3] {};
+	//DescriptorSet scene_set_lines {};
+	//DescriptorSet scene_set_meshes {};
 };
 
 BF_END_NAMESPACE

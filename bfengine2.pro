@@ -56,6 +56,7 @@ HEADERS += \
     src/graphics/render_paths/deferred_render_path.hpp \
     src/graphics/render_paths/graphics_context.hpp \
     src/graphics/render_paths/point_light_render_path.hpp \
+    src/graphics/resource_array.hpp \
     src/graphics/shader_description.hpp \
     src/graphics/types.hpp \
     src/graphics/vulkan/vk_convert_enum.hpp \

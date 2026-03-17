@@ -28,6 +28,7 @@ enum class EngineDescriptor
 	CAMERA_MATRICES,
 	UI_CAMERA_MATRIX,
 	MODEL_MATRICES,
+	COLOR,
 	COLORS,
 	TEXTURES,
 	//MATERIAL_DATA,
@@ -37,14 +38,6 @@ enum class EngineDescriptor
 	SPOT_LIGHTS,
 	//AREA_LIGHTS,
 	BONE_MATRICES,
-};
-
-enum class EngineConstants
-{
-	OBJECT_INDEX,
-	MATERIAL_INDEX,
-	FACTOR,
-	TIME,
 };
 
 struct TextureInput
@@ -71,6 +64,7 @@ static uint32_t GetDescriptorSet(EngineDescriptor desc)
 		case EngineDescriptor::CAMERA_MATRICES: return 0;
 		case EngineDescriptor::UI_CAMERA_MATRIX: return 0;
 		case EngineDescriptor::MODEL_MATRICES: return 0;
+		case EngineDescriptor::COLOR: return 1;
 		case EngineDescriptor::COLORS: return 0;
 		case EngineDescriptor::TEXTURES: return 1;
 		//case EngineDescriptor::MATERIAL_DATA: return 1;
@@ -89,6 +83,7 @@ static uint32_t GetDescriptorBinding(EngineDescriptor desc)
 		case EngineDescriptor::CAMERA_MATRICES: return 0;
 		case EngineDescriptor::UI_CAMERA_MATRIX: return 0;
 		case EngineDescriptor::MODEL_MATRICES: return 1;
+		case EngineDescriptor::COLOR: return 0;
 		case EngineDescriptor::COLORS: return 2;
 		case EngineDescriptor::TEXTURES: return 0;
 		//case EngineDescriptor::MATERIAL_DATA: return 0;

@@ -140,20 +140,41 @@ int main()
 	std::vector<glm::mat4> matrices(32, glm::mat4(1.0f));
 	matrices[1] = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -4.03f, 0.0f)); // TODO: depth bias
 
-	std::vector<glm::vec4> colors
-	{
-		{ 1.0f, 0.0f, 0.0f, 1.0f },
-		{ 0.0f, 1.0f, 0.0f, 1.0f },
-		{ 0.0f, 0.0f, 1.0f, 1.0f },
-		{ 1.0f, 1.0f, 1.0f, 1.0f },
-	};
+	std::vector<glm::vec4> colors(32, glm::vec4(1.0f));
+	colors[0] = { 1.0f, 0.0f, 0.0f, 1.0f };
+	colors[1] = { 0.0f, 1.0f, 0.0f, 1.0f };
+	colors[2] = { 0.0f, 0.0f, 1.0f, 1.0f };
 
 	std::vector<glm::vec4> point_lights
 	{
 		{ 0.0f, 0.0f, 0.0f, 16.0f },
 	};
 
-	std::vector<GraphicsContext> graphics_context(device->GetFrameCount());
+	device->RegisterDescriptorLayout("Global 3D", {
+					{ 0, Descriptor3::Type::UNIFORM_BUFFER, 1, Shader::Type::VERTEX },
+					{ 1, Descriptor3::Type::UNIFORM_BUFFER, 1, Shader::Type::VERTEX },
+				});
+
+	device->RegisterDescriptorLayout("Global 2D", {
+					{ 0, Descriptor3::Type::UNIFORM_BUFFER, 1, Shader::Type::VERTEX },
+				});
+
+	device->RegisterDescriptorLayout("Color Texture Material", {
+					{ 0, Descriptor3::Type::TEXTURE, 1, Shader::Type::FRAGMENT },
+					{ 1, Descriptor3::Type::UNIFORM_BUFFER, 1, Shader::Type::FRAGMENT },
+				});
+
+	device->RegisterDescriptorLayout("Deferred Point Light", {
+					{ 0, Descriptor3::Type::TEXTURE, 1, Shader::Type::FRAGMENT },
+					{ 1, Descriptor3::Type::TEXTURE, 1, Shader::Type::FRAGMENT },
+					{ 2, Descriptor3::Type::TEXTURE, 1, Shader::Type::FRAGMENT },
+					{ 3, Descriptor3::Type::TEXTURE, 1, Shader::Type::FRAGMENT },
+					{ 4, Descriptor3::Type::UNIFORM_BUFFER, 1, Shader::Type::FRAGMENT },
+					{ 5, Descriptor3::Type::UNIFORM_BUFFER, 1, Shader::Type::FRAGMENT },
+				});
+
+	//std::vector<GraphicsContext> graphics_context(device->GetFrameCount());
+	GraphicsContext graphics_context;
 
 	std::vector<Texture> gbuffer_textures(3);
 	Texture gbuffer_depth {};
@@ -193,18 +214,19 @@ int main()
 
 	final_fbo = device->CreateFramebuffer(final_fbo_desc);
 
-	RenderDeviceVK *vk_device = static_cast<RenderDeviceVK *>(device);
+	//GraphicsContext *context = &graphics_context;
 
 	//uint32_t frame_index = 0;
-	for (auto &context: graphics_context)
+	//for (auto &context: graphics_context)
 	{
-		context.active_camera_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4) * 2);
-		context.model_matrices_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, matrices);
+		//context.active_camera_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4) * 2);
+		graphics_context.active_camera_ubo = device->CreateBuffer2(GPUBuffer::UNIFORM, sizeof(glm::mat4) * 2);
+		graphics_context.model_matrices_ubo = device->CreateBuffer2(GPUBuffer::UNIFORM, sizeof(glm::mat4) * matrices.size());
 		//context.active_camera_ubo = vk_device->graphics_data.frame_data[frame_index].active_camera_ubo;
 		//context.model_matrices_ubo = vk_device->graphics_data.frame_data[frame_index].model_matrices_ubo;
-		context.colors_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, colors);
-		context.point_lights_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, point_lights);
-		context.camera_light_data = device->CreateBuffer(GPUBuffer::UNIFORM, sizeof(PointLightCameraData) * 1);
+		graphics_context.colors_ubo = device->CreateBuffer2(GPUBuffer::UNIFORM, colors);
+		graphics_context.point_lights_ubo = device->CreateBuffer2(GPUBuffer::UNIFORM, point_lights);
+		graphics_context.camera_light_data = device->CreateBuffer2(GPUBuffer::UNIFORM, sizeof(PointLightCameraData) * 1);
 
 		/*context.gbuffer_textures.resize(3);
 		context.gbuffer_textures[0] = device->CreateTexture(fmt::format("Render Target 0 frame {}", frame_index), color_desc);
@@ -217,12 +239,30 @@ int main()
 		context.gbuffer_textures[1] = t2;
 		context.gbuffer_depth = td;*/
 
-		context.text_vbo = device->CreateBuffer(GPUBuffer::VERTEX, sizeof(float) * 5 * 6 * 100);
+		graphics_context.text_vbo = device->CreateBuffer2(GPUBuffer::VERTEX, sizeof(float) * 5 * 6 * 100);
 
 		//frame_index++;
 	}
 
+	graphics_context.global_3d_set = device->CreateDescriptorSet("Global 3D");
+	device->WriteDescriptor(graphics_context.global_3d_set, 0, graphics_context.active_camera_ubo);
+	device->WriteDescriptor(graphics_context.global_3d_set, 1, graphics_context.model_matrices_ubo);
 
+	glm::mat4 ortho;
+	switch (config.render.api)
+	{
+		case Config::Render::API::VK: ortho = glm::ortho(0.0f, float(config.window.width), 0.0f, float(config.window.height)); break;
+		case Config::Render::API::GL: ortho = glm::ortho(0.0f, float(config.window.width), float(config.window.height), 0.0f); break;
+	}
+
+	//glm::mat4 ortho = glm::ortho(0.0f, float(config.window.width), 0.0f, float(config.window.height));
+	//glm::mat4 ortho = glm::ortho(0.0f, float(config.window.width), float(config.window.height), 0.0f);
+	//ortho = glm::ortho(0.0f, float(config.window.width), 0.0f, float(config.window.height));
+	GPUBuffer ortho_ubo = device->CreateBuffer2(GPUBuffer::UNIFORM, sizeof(glm::mat4));
+	device->UpdateBuffer(ortho_ubo, sizeof(glm::mat4), glm::value_ptr(ortho), 0);
+
+	graphics_context.global_2d_set = device->CreateDescriptorSet("Global 2D");
+	device->WriteDescriptor(graphics_context.global_2d_set, 0, ortho_ubo);
 
 	//FramebufferID gbuffer = device->CreateFramebuffer(framebuffer_desc);
 
@@ -231,28 +271,6 @@ int main()
 	Shader vs_flip = resources.LoadShader("general vertex ui");
 	Shader fs_flip = resources.LoadShader("general fragment texture");
 
-	/*TextureDesc final_texture_desc
-	{
-		.width = config.window.width,
-		.height = config.window.height,
-		.format = Texture::Format::RGBA16F,
-		.usage = Texture::Usage::COLOR_ATTACHMENT | Texture::Usage::SHADER_READ,
-		.levels = 1,
-		.pixels = nullptr,
-		.generate_mipmaps = false,
-	};*/
-
-	/*Texture flip_texture = device->CreateTexture("Flip Texture", final_texture_desc);
-
-	FramebufferDesc final_fbo_desc
-	{
-		.width = config.window.width,
-		.height = config.window.height,
-		.color_textures = { flip_texture },
-		.depth_texture = gbuffer_depth,
-	};
-
-	FramebufferID final_fbo = device->CreateFramebuffer(final_fbo_desc);*/
 
 	PipelineDesc pipeline_flip_desc
 	{
@@ -265,23 +283,20 @@ int main()
 			.depth_write = false,
 		},
 		.framebuffer_id = {},
+		.descriptor_layouts = { "Global 2D", "Material" },
+		//.constants = { EngineConstants::OBJECT_INDEX },
 	};
 
-	glm::mat4 ortho;
-	switch (config.render.api)
-	{
-		case Config::Render::API::VK: ortho = glm::ortho(0.0f, float(config.window.width), 0.0f, float(config.window.height)); break;
-		case Config::Render::API::GL: ortho = glm::ortho(0.0f, float(config.window.width), float(config.window.height), 0.0f); break;
-	}
-
-	//glm::mat4 ortho = glm::ortho(0.0f, float(config.window.width), 0.0f, float(config.window.height));
-	//glm::mat4 ortho = glm::ortho(0.0f, float(config.window.width), float(config.window.height), 0.0f);
-	//ortho = glm::ortho(0.0f, float(config.window.width), 0.0f, float(config.window.height));
-	GPUBuffer ortho_ubo = device->CreateBuffer(GPUBuffer::UNIFORM, sizeof(glm::mat4));
-	device->UpdateBuffer(ortho_ubo, sizeof(glm::mat4), glm::value_ptr(ortho), 0);
-
 	PipelineID pipeline_flip = device->CreatePipeline("Flip Pipeline", pipeline_flip_desc);
-	DescriptorSet flip_scene_set[3];
+	DescriptorSet flip_scene_set;
+	DescriptorSet flip_material_set;
+
+	flip_scene_set = device->CreateDescriptorSet("Global 2D");
+	flip_material_set = device->CreateDescriptorSet("Material");
+	device->WriteDescriptor(flip_scene_set, 0, ortho_ubo);
+	device->WriteDescriptor(flip_material_set, 0, final_texture);
+
+	/*DescriptorSet flip_scene_set[3];
 	DescriptorSet flip_material_set[3];
 	for (uint32_t i = 0; i < device->GetFrameCount(); i++)
 	{
@@ -289,7 +304,7 @@ int main()
 		flip_material_set[i] = device->CreateDescriptorSet(pipeline_flip, Descriptor2::Set::MATERIAL);
 		device->WriteDescriptor(flip_scene_set[i], 0, ortho_ubo);
 		device->WriteDescriptor(flip_material_set[i], 0, final_texture);
-	}
+	}*/
 	/*DescriptorSet flip_scene_set = device->CreateDescriptorSet(pipeline_flip, Descriptor2::Set::SCENE);
 	DescriptorSet flip_material_set = device->CreateDescriptorSet(pipeline_flip, Descriptor2::Set::MATERIAL);
 	device->WriteDescriptor(flip_scene_set, 0, ortho_ubo);
@@ -311,12 +326,14 @@ int main()
 			.depth_write = false,
 		},
 		.framebuffer_id = {},
+		.descriptor_layouts = { "Global 2D", "Color Texture Material" },
+		//.constants = { EngineConstants::OBJECT_INDEX },
 	};
 	PipelineID pipeline_ui = device->CreatePipeline("ui", desc4);
 
 
 	auto grid_verts = GenerateGrid(32.0f, 2.0f);
-	GPUBuffer grid_vbo = device->CreateBuffer(GPUBuffer::VERTEX, grid_verts);
+	GPUBuffer grid_vbo = device->CreateBuffer2(GPUBuffer::VERTEX, grid_verts);
 	//GPUBuffer grid_vbo = device->CreateBuffer(GPUBuffer::VERTEX, sizeof(Vertex3D) * grid_verts.size());
 	//device->UpdateBuffer(grid_vbo, sizeof(Vertex3D) * grid_verts.size(), grid_verts.data(), 0);
 
@@ -335,7 +352,7 @@ int main()
 		width, height, 0.0, 1.0f, 1.0f,
 	};
 
-	GPUBuffer quad_vbo = device->CreateBuffer(GPUBuffer::VERTEX, quad_verts);
+	GPUBuffer quad_vbo = device->CreateBuffer2(GPUBuffer::VERTEX, quad_verts);
 
 	Transform view_transform;
 	view_transform.pos = glm::vec3(5.0f, 4.0f, 10.0f);
@@ -383,7 +400,14 @@ int main()
 	Font font;
 	Texture font_tex = resources.LoadTexture(font.TextureName());
 	font.SetTextureScale(1.0f / 512.0f);
-	DescriptorSet ui_scene_set[3];
+	DescriptorSet ui_scene_set = device->CreateDescriptorSet("Global 2D");
+	DescriptorSet ui_material_set = device->CreateDescriptorSet("Color Texture Material");
+	device->WriteDescriptor(ui_scene_set, 0, ortho_ubo);
+	//device->WriteDescriptor(ui_scene_set, 2, graphics_context.colors_ubo);
+	device->WriteDescriptor(ui_material_set, 0, font_tex);
+	device->WriteDescriptor2(ui_material_set, 1, resources.colors_ubo, 0 * device->ubo_alignment, sizeof(glm::vec4));
+
+	/*DescriptorSet ui_scene_set[3];
 	DescriptorSet ui_material_set[3];
 	for (uint32_t i = 0; i < device->GetFrameCount(); i++)
 	{
@@ -393,7 +417,7 @@ int main()
 		device->WriteDescriptor(ui_scene_set[i], 0, ortho_ubo);
 		device->WriteDescriptor(ui_scene_set[i], 2, graphics_context[i].colors_ubo);
 		device->WriteDescriptor(ui_material_set[i], 0, font_tex);
-	}
+	}*/
 
 	/*DescriptorSet ui_scene_set = device->CreateDescriptorSet(pipeline_ui, Descriptor2::Set::SCENE);
 	DescriptorSet ui_material_set = device->CreateDescriptorSet(pipeline_ui, Descriptor2::Set::MATERIAL);
@@ -410,7 +434,9 @@ int main()
 	uint32_t max_time = 0;
 
 	//device->Test();
-	Mesh grid_mesh { "grid_mesh", { { { 0, uint32_t(grid_verts.size()) }, nullptr, 3 } }, grid_vbo, 1 };
+	auto grid_material = resources.LoadMaterial("grid_material");
+	DescriptorSet grid_set = std::static_pointer_cast<ColorMaterial>(grid_material)->set;
+	Mesh grid_mesh { /*"grid_mesh",*/ { { { 0, uint32_t(grid_verts.size()) }, grid_material, 3, grid_set } }, grid_vbo, 1 };
 	std::vector<Mesh> meshes2;
 	meshes2.push_back(grid_mesh);
 
@@ -433,13 +459,15 @@ int main()
 	glm::vec3 pos[2];
 	glm::vec3 sphere_pos(0.0f);
 
-	GPUBuffer editing_vbo = device->CreateBuffer(GPUBuffer::VERTEX, sizeof(float) * (3 + 2 + 3 + 4) * 512);
+	GPUBuffer editing_vbo = device->CreateBuffer2(GPUBuffer::VERTEX, sizeof(float) * (3 + 2 + 3 + 4) * 512);
 	std::vector<std::array<NormalMappedVertex, 6>> walls;
 	//std::array<glm::vec3, 2> pos;
 	//walls.push_back(MakeWall({{ { -8.0f, -4.0f, 8.0f, }, { -8.0f, -4.0f, -8.0f, } }}));
 	//device->UpdateBuffer(editing_vbo, sizeof(NormalMappedVertex) * 6 * walls.size(), walls.data(), 0);
 	// next 2 lines is working
-	//Surface wall_surf { { 0, 6 * uint32_t(walls.size()) }, resources.LoadMaterial("wall/gotbwall4"), 0, device->CreateDescriptorSet(deferred.pipeline, Descriptor2::Set::MATERIAL) };
+	auto wall_mat = resources.LoadMaterial("wall/gotbwall4");
+	DescriptorSet wall_set = std::static_pointer_cast<CustomMaterial>(wall_mat)->set;
+	Surface wall_surf { { 0, 6 * uint32_t(walls.size()) }, wall_mat, 0, wall_set };
 	//std::static_pointer_cast<CustomMaterial>(wall_surf.material)->Setup2(device, &graphics_context, Descriptor2::Set::MATERIAL, wall_surf.descriptor_set);
 
 	uint32_t editing_wall_index = 0;
@@ -471,7 +499,7 @@ int main()
 				// begin draw
 				pos[0] = pos[1] = sphere_pos;
 				walls.push_back({});
-				//wall_surf.vertex_range.count = walls.size() * 6;
+				wall_surf.vertex_range.count = walls.size() * 6;
 
 				editing_mode = EditingMode::DRAW;
 			}
@@ -495,7 +523,7 @@ int main()
 			else
 				walls[editing_wall_index] = MakeWall({{ pos[0], pos[1] }});
 
-			//device->UpdateBuffer(editing_vbo, sizeof(NormalMappedVertex) * 6 * walls.size(), walls.data(), 0);
+			device->UpdateBuffer(editing_vbo, sizeof(NormalMappedVertex) * 6 * walls.size(), walls.data(), 0);
 		}
 
 		float move_speed = 10.0f;
@@ -562,7 +590,7 @@ int main()
 			.view = view,
 		};
 
-		GraphicsContext *context = &graphics_context.at(device->GetFrameIndex());
+		GraphicsContext *context = &graphics_context;
 
 		device->UpdateBuffer(context->active_camera_ubo, sizeof(CameraMatrices), &camera_matrices, 0);
 		device->UpdateBuffer(context->camera_light_data, sizeof(PointLightCameraData), &point_light_camera_data, 0);
@@ -603,6 +631,14 @@ int main()
 		start_time = SDL_GetTicks();
 		device->BeginFrame();
 
+		/*vk_device->FlushBuffer(context->active_camera_ubo);
+		vk_device->FlushBuffer(context->model_matrices_ubo);
+		vk_device->FlushBuffer(context->camera_light_data);
+		vk_device->FlushBuffer(context->point_lights_ubo);
+		vk_device->FlushBuffer(context->colors_ubo);
+		vk_device->FlushBuffer(context->text_vbo);
+		vk_device->MemoryBarrier();*/
+
 		device->SetCullMode(2); // 2
 
 		device->LayoutTransition(gbuffer_textures[0], ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
@@ -615,13 +651,13 @@ int main()
 		device->LayoutTransition({}, ImageLayout::UNDEFINED, ImageLayout::COLOR_ATTACHMENT);
 
 		device->BeginRenderPass(gbuffer, RenderPass::Clear::COLOR_DEPTH /*, context->final_depth*/);
-		deferred.Render(meshes, device->GetFrameIndex());
+		deferred.Render(graphics_context, meshes, device->GetFrameIndex());
 
-		/*device->BindVertexBuffer(editing_vbo);
+		device->BindVertexBuffer(editing_vbo);
 		device->BindDescriptorSet(Descriptor2::Set::MATERIAL, wall_surf.descriptor_set);
 		//device->Push(Shader::Type::VERTEX, 0, 0);
-		device->PushConstant(0, 0);
-		device->Draw(wall_surf.vertex_range.start, wall_surf.vertex_range.count);*/
+		device->PushConstant(EngineConstants::OBJECT_INDEX, 0);
+		device->Draw(wall_surf.vertex_range.start, wall_surf.vertex_range.count);
 
 		device->EndRenderPass(gbuffer);
 
@@ -634,13 +670,13 @@ int main()
 
 		device->BeginRenderPass(final_fbo, RenderPass::Clear::COLOR);
 		device->SetCullMode(1);
-		point_light_rp.Render(device->GetFrameIndex());
+		point_light_rp.Render(graphics_context, device->GetFrameIndex());
 		device->SetCullMode(2);
 
 		//meshes2.clear();
 		//meshes3.clear();
 		//device->SetCullMode(2);
-		debug.Render(meshes2, meshes3, device->GetFrameIndex()); // grid, sphere
+		debug.Render(graphics_context, meshes2, meshes3, device->GetFrameIndex()); // grid, sphere
 		//device->SetCullMode(0);
 		device->EndRenderPass(final_fbo);
 
@@ -648,17 +684,17 @@ int main()
 
 		device->BeginRenderPass({}, RenderPass::Clear::COLOR);
 		device->BindPipeline(pipeline_flip);
-		device->BindDescriptorSet(Descriptor2::Set::SCENE, flip_scene_set[device->GetFrameIndex()]);
-		device->BindDescriptorSet(Descriptor2::Set::MATERIAL, flip_material_set[device->GetFrameIndex()]);
+		device->BindDescriptorSet(Descriptor2::Set::SCENE, flip_scene_set);
+		device->BindDescriptorSet(Descriptor2::Set::MATERIAL, flip_material_set);
 		device->BindVertexBuffer(quad_vbo);
 		device->Draw(0, 6);
 
 		device->BindPipeline(pipeline_ui);
-		device->BindDescriptorSet(Descriptor2::Set::SCENE, ui_scene_set[device->GetFrameIndex()]);
-		device->BindDescriptorSet(Descriptor2::Set::MATERIAL, ui_material_set[device->GetFrameIndex()]);
+		device->BindDescriptorSet(Descriptor2::Set::SCENE, ui_scene_set);
+		device->BindDescriptorSet(Descriptor2::Set::MATERIAL, ui_material_set);
 		//device->Push(Shader::Type::FRAGMENT, 4, 3);
-		device->PushConstant(EngineConstants::OBJECT_INDEX, 0); // WTF?
-		device->PushConstant(EngineConstants::MATERIAL_INDEX, 3); // slot index is 0 for fragment shader, do something about it?
+		//device->PushConstant(EngineConstants::OBJECT_INDEX, 0); // WTF?
+		//device->PushConstant(EngineConstants::MATERIAL_INDEX, 3); // slot index is 0 for fragment shader, do something about it?
 
 		std::span<float> text_verts = device->MapBuffer<float>(context->text_vbo);
 		//text_string = fmt::format("{} {} {} {}", view_transform.rot.x, view_transform.rot.y, view_transform.rot.z, view_transform.rot.w);

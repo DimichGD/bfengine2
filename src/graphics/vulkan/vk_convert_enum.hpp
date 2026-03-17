@@ -12,6 +12,7 @@ VkPrimitiveTopology ConvertEnum(Topology topology);
 VkFormat ConvertEnum(bf::Texture::Format format);
 VkImageLayout ConvertEnum(ImageLayout layout);
 VkDescriptorType ConvertEnum(Descriptor2::Type type);
+VkDescriptorType ConvertEnum(Descriptor3::Type type);
 VkCompareOp ConvertEnum(DepthFunc func);
 
 BF_END_VK_NAMESPACE

@@ -96,6 +96,7 @@ ShaderDesc Parser::ReadShader()
 		{ "UI_CAMERA_MATRIX", EngineDescriptor::UI_CAMERA_MATRIX },
 		{ "MODEL_MATRICES", EngineDescriptor::MODEL_MATRICES },
 		{ "COLORS", EngineDescriptor::COLORS },
+		{ "COLOR", EngineDescriptor::COLOR },
 		{ "TEXTURES", EngineDescriptor::TEXTURES },
 		//{ "MATERIAL_DATA", EngineDescriptor::MATERIAL_DATA },
 		{ "LIGHT_CAMERA_DATA", EngineDescriptor::LIGHT_CAMERA_DATA },

@@ -12,9 +12,9 @@ public:
 	BF_NON_MOVABLE(Deferred)
 	BF_NON_COPYABLE(Deferred)
 
-	void Create(std::vector<GraphicsContext> &context, FramebufferID out_fbo);
+	void Create(GraphicsContext &context, FramebufferID out_fbo);
 	void Destroy();
-	void Render(std::vector<Mesh> &meshes, uint32_t current_index);
+	void Render(GraphicsContext &context, std::vector<Mesh> &meshes, uint32_t current_index);
 	/*FramebufferID GetFramebuffer() const { return gbuffer; }
 	Texture GetColorTexture(uint32_t index) { return device->GetFramebuffer(gbuffer).color_textures[index]; }
 	std::vector<Texture> GetColorTextures() { return device->GetFramebuffer(gbuffer).color_textures; }
@@ -45,7 +45,7 @@ public:
 	uint32_t height = 0;
 
 	//uint32_t current_index = 0;
-	DescriptorSet scene_set[3] {};
+	//DescriptorSet scene_set {};
 	//DescriptorSet material_set {};
 	//uint32_t material_set = 0;
 	//std::vector<Texture> render_targets;

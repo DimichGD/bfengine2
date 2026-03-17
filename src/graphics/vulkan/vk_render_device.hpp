@@ -4,10 +4,31 @@
 #include "graphics/shader_description.hpp"
 #include "graphics/render_paths/graphics_context.hpp"
 #include "io/file.hpp"
+#include <set>
+#include <variant>
 
 struct SDL_Window;
 
 BF_BEGIN_NAMESPACE
+
+struct DescriptorBuffer
+{
+	GPUBuffer buffer;
+};
+
+struct DescriptorBufferRange
+{
+	GPUBuffer buffer;
+	uint32_t offset;
+	uint32_t size;
+};
+
+struct DescriptorTexture
+{
+	Texture texture;
+};
+
+using DescriptorVariant = std::variant<DescriptorBuffer, DescriptorBufferRange, DescriptorTexture>;
 
 class RenderDeviceVK: public RenderDevice
 {
@@ -44,7 +65,8 @@ public:
 
 	GPUBuffer CreateBuffer(GPUBuffer::Type type, uint32_t size, const void *data = nullptr) override;
 	void UpdateBuffer(GPUBuffer buffer, uint32_t size, const void *data, uint32_t offset) override;
-	void *MapBuffer(GPUBuffer buffer) override;
+	void DestroyBuffer(GPUBuffer buffer);
+	std::span<std::byte> MapBuffer(GPUBuffer buffer) override;
 	void UnMapBuffer(GPUBuffer buffer) override;
 
 	template<typename T>
@@ -56,17 +78,27 @@ public:
 	}
 
 	template<typename T>
+	GPUBuffer CreateBuffer2(GPUBuffer::Type type, const std::vector<T> &data)
+	{
+		GPUBuffer buffer = CreateBuffer2(type, sizeof(T) * data.size());
+		UpdateBuffer(buffer, sizeof(T) * data.size(), data.data(), 0);
+		return buffer;
+	}
+
+	template<typename T>
 	std::span<T> MapBuffer(GPUBuffer buffer)
 	{
-		T *t = reinterpret_cast<T*>(MapBuffer(buffer));
-		return { t, size_t(buffer.size / sizeof(T)) };
+		std::span<std::byte> result = MapBuffer(buffer);
+		assert(result.size() % sizeof(T) == 0);
+
+		return { reinterpret_cast<T*>(result.data()), result.size() / sizeof(T) }; // TODO: check for ub
 	}
 
 	void BindVertexBuffer(GPUBuffer buffer) override;
 	void BindIndexBuffer(GPUBuffer buffer) override {}
 
 	DescriptorSet CreateDescriptorSet(PipelineID pipeline, Descriptor2::Set set) override;
-	void WriteDescriptor(DescriptorSet set, uint32_t binding, GPUBuffer value) override;
+	void WriteDescriptor(DescriptorSet set, uint32_t binding, GPUBuffer buffer) override;
 	void WriteDescriptor(DescriptorSet set, uint32_t binding, Texture value, uint32_t index = 0) override;
 	void BindDescriptorSet(Descriptor2::Set index, DescriptorSet descriptor_set) override; // TODO: rename index
 	//void Push(Shader::Type type, uint32_t offset, glm::vec4 value);
@@ -86,12 +118,17 @@ public:
 	//uint32_t RegisterTextures(const std::vector<Texture> &textures);
 	//void CreateTextureSet();
 	//void CreateVertexSet();
-	void RegisterMaterial(uint32_t type, const std::vector<Descriptor2> &descriptors);
-	DescriptorSet CreateMaterialDescriptorSet(uint32_t type);
-	//Texture GetDepthTexture();
-	//void SetDepthTexture(Texture depth_texture);
+	void RegisterMaterial(uint32_t type, const std::vector<Descriptor3> &descriptors);
+	void RegisterDescriptorLayout(std::string name, const std::vector<Descriptor3> &bindings);
+	//DescriptorSet CreateMaterialDescriptorSet(uint32_t type);
+	void FlushBuffer(GPUBuffer buffer);
+	void MemoryBarrier();
+	GPUBuffer CreateBuffer2(GPUBuffer::Type type, uint32_t size, const void *data = nullptr);
+	//void UpdateBuffer2(GPUBuffer buffer, uint32_t size, const void *data, uint32_t offset);
+	void WriteDescriptor2(DescriptorSet set, uint32_t binding, GPUBuffer buffer, uint32_t offset, uint32_t size);
+	DescriptorSet CreateDescriptorSet(std::string name);
 
-	//void SetDebugName(Texture texture, const char *name);
+	uint32_t ubo_alignment = 0;
 
 private:
 	Config *config = nullptr;
@@ -105,11 +142,12 @@ private:
 
 	uint32_t times[32] {};
 
-	const uint32_t frames_in_flight = 2;
+	const uint32_t frames_in_flight = 1;
 	//GraphicsData graphics_data;
 
 	//uint32_t textures_set_last_index = 0;
 	std::map<uint32_t, ShaderDesc> shader_desc_map;
+	std::set<GPUBuffer> updated_buffers;
 
 	//std::map<Handle, TrackedResource> tracked_resources;
 	//std::vector<ImageLayout> swapchain_image_prev_layouts;

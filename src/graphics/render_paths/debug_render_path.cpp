@@ -11,7 +11,7 @@ Debug::Debug(RenderDevice *device, Config *config, ResourceManager *resources)
 	this->height = config->window.height;
 }
 
-void Debug::Create(std::vector<GraphicsContext> &context, FramebufferID out_fbo)
+void Debug::Create(GraphicsContext &context, FramebufferID out_fbo)
 {
 	//this->context = context;
 	const char *forward_line_shader_name = config->render.api == Config::Render::API::VK ? "forward/vk_line" : "forward/gl_line";
@@ -33,6 +33,8 @@ void Debug::Create(std::vector<GraphicsContext> &context, FramebufferID out_fbo)
 			.depth_write = false,
 		},
 		.framebuffer_id = out_fbo,
+		.descriptor_layouts = { "Global 3D", "Color Material" },
+		.constants = { EngineConstants::OBJECT_INDEX },
 	};
 
 	PipelineDesc pipeline_mesh_desc
@@ -46,23 +48,27 @@ void Debug::Create(std::vector<GraphicsContext> &context, FramebufferID out_fbo)
 			.depth_write = false,
 		},
 		.framebuffer_id = out_fbo,
+		.descriptor_layouts = { "Global 3D", "Material" },
+		.constants = { EngineConstants::OBJECT_INDEX },
 	};
 
 	pipeline_lines = device->CreatePipeline("debug/colored_lines", pipeline_line_desc);
 	pipeline_meshes = device->CreatePipeline("debug/textured_meshes", pipeline_mesh_desc);
 
-	for (uint32_t i = 0; i < static_cast<RenderDeviceVK *>(device)->GetFrameCount(); i++)
+	/*//for (uint32_t i = 0; i < static_cast<RenderDeviceVK *>(device)->GetFrameCount(); i++)
 	{
-		scene_set_lines[i] = device->CreateDescriptorSet(pipeline_lines, Descriptor2::Set::SCENE);
-		scene_set_meshes[i] = device->CreateDescriptorSet(pipeline_meshes, Descriptor2::Set::SCENE);
+		//scene_set_lines = device->CreateDescriptorSet(pipeline_lines, Descriptor2::Set::SCENE);
+		//scene_set_meshes = device->CreateDescriptorSet(pipeline_meshes, Descriptor2::Set::SCENE);
+		scene_set_lines = static_cast<RenderDeviceVK *>(device)->CreateDescriptorSet("Global 3D");
+		scene_set_meshes = static_cast<RenderDeviceVK *>(device)->CreateDescriptorSet("Global 3D");
 
-		device->WriteDescriptor(scene_set_lines[i], 0, context[i].active_camera_ubo);
-		device->WriteDescriptor(scene_set_lines[i], 1, context[i].model_matrices_ubo);
-		device->WriteDescriptor(scene_set_lines[i], 2, context[i].colors_ubo);
+		device->WriteDescriptor(scene_set_lines, 0, context.active_camera_ubo);
+		device->WriteDescriptor(scene_set_lines, 1, context.model_matrices_ubo);
+		//device->WriteDescriptor(scene_set_lines, 2, context.colors_ubo);
 
-		device->WriteDescriptor(scene_set_meshes[i], 0, context[i].active_camera_ubo);
-		device->WriteDescriptor(scene_set_meshes[i], 1, context[i].model_matrices_ubo);
-	}
+		device->WriteDescriptor(scene_set_meshes, 0, context.active_camera_ubo);
+		device->WriteDescriptor(scene_set_meshes, 1, context.model_matrices_ubo);
+	}*/
 }
 
 void Debug::Destroy()
@@ -70,12 +76,12 @@ void Debug::Destroy()
 	//
 }
 
-void Debug::Render(std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2, uint32_t current_index)
+void Debug::Render(GraphicsContext &context, std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2, uint32_t current_index)
 {
 	//device->BeginRenderPass({}, RenderPass::Clear::COLOR);
 
 	device->BindPipeline(pipeline_lines);
-	device->BindDescriptorSet(Descriptor2::Set::SCENE, scene_set_lines[current_index]);
+	device->BindDescriptorSet(Descriptor2::Set::SCENE, context.global_3d_set);
 	//device->BindDescriptorSet(Descriptor2::Set::MATERIAL, context->material_set);
 
 	for (auto &mesh: meshes)
@@ -86,19 +92,19 @@ void Debug::Render(std::vector<Mesh> &meshes, std::vector<Mesh> &meshes2, uint32
 		for (auto &surf: mesh.surfaces)
 		{
 			//device->Push(Shader::Type::FRAGMENT, 4, surf.material_index);
-			device->PushConstant(EngineConstants::MATERIAL_INDEX, int(surf.material_index));
+			//device->PushConstant(EngineConstants::MATERIAL_INDEX, int(surf.material_index));
 			//materials.at(surf.texture_index).Bind(device);
 			//if (!surf.material->Ready())
 			//	surf.material->Setup(device, device->CreateDescriptorSet(pipeline_lines, Descriptor2::Set::MATERIAL));
 
 			//surf.material->Bind(device);
-			//device->BindDescriptorSet(Descriptor2::Set::MATERIAL, surf.material.descriptor_set);
+			device->BindDescriptorSet(Descriptor2::Set::MATERIAL, surf.descriptor_set);
 			device->Draw(surf.vertex_range.start, surf.vertex_range.count);
 		}
 	}
 
 	device->BindPipeline(pipeline_meshes);
-	device->BindDescriptorSet(Descriptor2::Set::SCENE, scene_set_meshes[current_index]);
+	device->BindDescriptorSet(Descriptor2::Set::SCENE, context.global_3d_set);
 
 	for (auto &mesh: meshes2)
 	{

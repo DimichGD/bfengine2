@@ -1,18 +1,18 @@
 #version 460 core
 
-layout(std140, set = 0, binding = 2) uniform Colors
+layout(std140, set = 1, binding = 0) uniform Colors
 {
-	vec4 U_COLORS[32];
+	vec4 U_COLOR;
 };
 
-layout(push_constant) uniform Constants
+/*layout(push_constant) uniform Constants
 {
 	layout(offset = 4) int U_MATERIAL_INDEX;
-};
+};*/
 
 layout(location = 0) out vec4 OUT_COLOR;
 
 void main()
 {
-	OUT_COLOR = U_COLORS[U_MATERIAL_INDEX];
+	OUT_COLOR = U_COLOR;
 }

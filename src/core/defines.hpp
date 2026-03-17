@@ -16,3 +16,11 @@
 #define BF_NON_MOVABLE(Class) \
 	Class(Class &&) = delete; \
 	Class &operator=(Class &&) = delete;
+
+#define BF_ASSERT(expr) \
+	do { \
+		if (!(expr)) { \
+			Error() << "Assertion failed." << #expr; \
+			std::terminate(); } \
+	} while (0);
+// TODO: move assert to assert.hpp
